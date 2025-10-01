@@ -1,0 +1,41 @@
+*.iml
+.kotlin
+.gradle
+**/build/
+xcuserdata
+!src/**/build/
+local.properties
+.idea
+.DS_Store
+captures
+.externalNativeBuild
+.cxx
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+node_modules/
+
+# Security - Environment and secrets
+.env*
+*.key
+*.pem
+secrets/
+config/local.properties
+*.keystore
+*.jks
+
+# IDE and OS
+.vscode/
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Build artifacts that might contain secrets
+**/build/outputs/
+**/build/generated/
