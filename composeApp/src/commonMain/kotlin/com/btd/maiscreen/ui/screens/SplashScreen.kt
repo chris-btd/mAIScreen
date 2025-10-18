@@ -22,7 +22,8 @@ import kotlin.random.Random
 
 @Composable
 fun SplashScreen(
-    onSplashComplete: () -> Unit
+    onSplashComplete: () -> Unit,
+    onAuthenticatedUserFound: (userEmail: String?) -> Unit = {}
 ) {
     var progress by remember { mutableFloatStateOf(0f) }
     
@@ -58,13 +59,33 @@ fun SplashScreen(
         label = "starTwinkle"
     )
     
-    // Start loading animation
+    // Start loading animation and check authentication
     LaunchedEffect(Unit) {
-        // Simulate loading time
+        var authCheckCompleted = false
+        
+        // Start authentication check in parallel with loading animation
+        com.btd.maiscreen.auth.AuthManager.checkAuthenticationStatus { isAuthenticated, userEmail ->
+            println("🔍 Authentication check result: authenticated=$isAuthenticated, email=$userEmail")
+            if (isAuthenticated) {
+                println("✅ Authenticated user found during splash: $userEmail")
+                onAuthenticatedUserFound(userEmail)
+            }
+            authCheckCompleted = true
+        }
+        
+        // Simulate loading time with progress animation
         for (i in 0..100) {
             progress = i / 100f
             delay(20)
         }
+        
+        // Wait for authentication check to complete if it hasn't already
+        var waitCount = 0
+        while (!authCheckCompleted && waitCount < 50) { // Max wait 1 second (50 * 20ms)
+            delay(20)
+            waitCount++
+        }
+        
         delay(500) // Extra delay to show completion
         onSplashComplete()
     }
@@ -139,6 +160,15 @@ fun SplashScreen(
                     fontSize = 14.sp,
                     color = Color.White.copy(alpha = 0.7f)
                 )
+                
+                // Authentication status text (for debugging)
+                if (animatedProgress > 0.5f) {
+                    Text(
+                        text = "Checking authentication...",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
             }
         }
     }

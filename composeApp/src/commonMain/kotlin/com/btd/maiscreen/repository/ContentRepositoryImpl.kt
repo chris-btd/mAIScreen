@@ -73,9 +73,9 @@ class ContentRepositoryImpl(
                     items = listOf(
                         ContentItem(
                             id = "TEST001",
-                            title = "🧪 Cookie Test",
-                            description = "Test CloudFront cookie retrieval",
-                            synopsis = "This is a test item to verify CloudFront signed cookies are being returned from the API. Click play to test cookie retrieval without starting video playback.",
+                            title = "🧪 AWS Backend Test",
+                            description = "Test AWS CloudFront integration",
+                            synopsis = "This test item verifies your AWS backend is working correctly. When AWS mode is enabled, it will make a real API call to your Lambda function and return the actual signed URL. When local mode is enabled, it will use demo videos. Click play to test your backend configuration.",
                             thumbnailColor = Color(0xFFFF6B35),
                             category = "Test",
                             duration = "Test",
@@ -106,7 +106,7 @@ class ContentRepositoryImpl(
                             genres = listOf("Sci-Fi", "Drama"),
                             cast = listOf("Dr. Maya Singh", "ARIA (AI)", "Prof. Chen"),
                             director = "AI Director Beta",
-                            assetId = "ASSET002"
+                            assetId = "ASSET001"
                         ),
                         ContentItem(
                             id = "2",

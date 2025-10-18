@@ -15,6 +15,7 @@ data class MainScreenUiState(
     val hasError: Boolean = false,
     val errorMessage: String? = null,
     val showDetailsDialog: Boolean = false,
-    val selectedContent: ContentItem? = null
+    val selectedContent: ContentItem? = null,
+    val watchList: List<ContentItem> = emptyList()
 ) : UiState
 

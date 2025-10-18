@@ -32,6 +32,7 @@ struct MainView: View {
     let onPlayContent: (ContentItem) -> Void
     let onToggleLike: (ContentItem) -> Void
     let onToggleWatchlist: (ContentItem) -> Void
+    let onLogoutClick: (() -> Void)?
     
     @State private var showDetailsSheet = false
     @State private var selectedContent: ContentItem?
@@ -138,7 +139,8 @@ struct MainView: View {
                     // Top Navigation Bar
                     TopNavigationBarView(
                         onSearchClick: onSearchClick,
-                        onProfileClick: onProfileClick
+                        onProfileClick: onProfileClick,
+                        onLogoutClick: onLogoutClick
                     )
                     
                     // Featured Content Hero Section
@@ -189,6 +191,13 @@ struct MainView: View {
 struct TopNavigationBarView: View {
     let onSearchClick: () -> Void
     let onProfileClick: () -> Void
+    let onLogoutClick: (() -> Void)?
+    
+    init(onSearchClick: @escaping () -> Void, onProfileClick: @escaping () -> Void, onLogoutClick: (() -> Void)? = nil) {
+        self.onSearchClick = onSearchClick
+        self.onProfileClick = onProfileClick
+        self.onLogoutClick = onLogoutClick
+    }
     
     var body: some View {
         HStack {
@@ -209,6 +218,14 @@ struct TopNavigationBarView: View {
                     Image(systemName: "person.circle")
                         .font(.system(size: 20))
                         .foregroundColor(.white)
+                }
+                
+                if let onLogoutClick = onLogoutClick {
+                    Button(action: onLogoutClick) {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                    }
                 }
             }
         }
@@ -659,6 +676,9 @@ struct ContentDetailsView: View {
         },
         onToggleWatchlist: { content in
             print("Toggle watchlist: \(content.title)")
+        },
+        onLogoutClick: {
+            print("Logout clicked")
         }
     )
 }

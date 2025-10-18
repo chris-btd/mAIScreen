@@ -181,7 +181,23 @@ class MainScreenViewModel(
                 when (val result = repository.toggleWatchlist(content.id)) {
                     is Success -> {
                         // Update the content in our state
-                        updateContentInState(result.data)
+                        val updatedContent = result.data
+                        updateContentInState(updatedContent)
+                        
+                        // Update watchlist based on the new status
+                        val currentState = state.value
+                        val newWatchList = if (updatedContent.isInWatchlist) {
+                            // Add to watchlist if not already present
+                            if (currentState.watchList.none { it.id == updatedContent.id }) {
+                                currentState.watchList + updatedContent
+                            } else {
+                                currentState.watchList
+                            }
+                        } else {
+                            // Remove from watchlist
+                            currentState.watchList.filter { it.id != updatedContent.id }
+                        }
+                        setState { copy(watchList = newWatchList) }
                     }
                     is ApiResponseError -> {
                         setState { 

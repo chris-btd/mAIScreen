@@ -2,6 +2,7 @@ package com.btd.maiscreen.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
@@ -42,28 +43,38 @@ fun VideoPlayerScreen(
             }
         )
         
-        // Close button overlay (top-left) - Higher z-index and better click handling
+        // Close button overlay (top-left) - Larger and more accessible
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(16.dp)
-                .size(56.dp)
-                .background(
-                    Color.Black.copy(alpha = 0.8f),
-                    shape = androidx.compose.foundation.shape.CircleShape
-                )
-                .clickable { 
-                    println("Close button clicked!")
-                    onBackClick() 
-                },
-            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "✕",
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold
-            )
+            IconButton(
+                onClick = {
+                    println("🔙 Close button clicked!")
+                    onBackClick()
+                },
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.9f),
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {
+                        println("🔙 Close button clicked (clickable)!")
+                        onBackClick()
+                    }
+            ) {
+                Text(
+                    text = "✕",
+                    color = Color.White,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
         
         // Loading indicator
@@ -71,12 +82,47 @@ fun VideoPlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f)),
-                contentAlignment = Alignment.Center
+                    .background(Color.Black.copy(alpha = 0.7f))
             ) {
+                // Close button on loading screen too
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            println("🔙 Close button clicked (from loading)!")
+                            onBackClick()
+                        },
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.9f),
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() }
+                            ) {
+                                println("🔙 Close button clicked (loading clickable)!")
+                                onBackClick()
+                            }
+                    ) {
+                        Text(
+                            text = "✕",
+                            color = Color.White,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                
+                // Loading content in center
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.align(Alignment.Center)
                 ) {
                     CircularProgressIndicator(
                         color = Color.White,

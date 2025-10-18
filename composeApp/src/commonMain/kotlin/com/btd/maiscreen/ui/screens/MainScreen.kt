@@ -5,6 +5,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -60,6 +63,7 @@ data class ContentCategory(
 fun MainScreen(
     onProfileClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onContentClick: (ContentItem) -> Unit = {},
     onPlayContent: (ContentItem) -> Unit = {},
     onToggleLike: (ContentItem) -> Unit = {},
@@ -90,6 +94,7 @@ fun MainScreen(
     // Get data from ViewModel state
     val featuredContent = uiState.featuredContent
     val contentCategories = uiState.contentCategories
+    val watchList = uiState.watchList
     
     // Generate random stars for background
     val stars = remember {
@@ -131,11 +136,18 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .padding(WindowInsets.statusBars.asPaddingValues())
         ) {
             // Top Navigation Bar
             TopNavigationBar(
                 onSearchClick = onSearchClick,
-                onProfileClick = onProfileClick
+                onProfileClick = onProfileClick,
+                onSettingsClick = onSettingsClick,
+                onLogoutClick = {
+                    // Import AuthManager and AppAuthState
+                    com.btd.maiscreen.auth.AuthManager.logout()
+                    com.btd.maiscreen.auth.AppAuthState.logout()
+                }
             )
             
             // Featured Content Hero Section
@@ -144,6 +156,22 @@ fun MainScreen(
                     content = content,
                     onPlayClick = { onPlayContent(content) }
                 )
+            }
+            
+            // My List Section (only show if watchlist has items)
+            if (watchList.isNotEmpty()) {
+                MyListSection(
+                    watchList = watchList,
+                    onContentClick = onContentClick,
+                    onShowDetails = { content ->
+                        viewModel.showContentDetails(content)
+                        onContentClick(content)
+                    },
+                    onPlayContent = onPlayContent,
+                    onToggleLike = onToggleLike,
+                    onToggleWatchlist = onToggleWatchlist
+                )
+                Spacer(modifier = Modifier.height(24.dp))
             }
             
             // Content Categories
@@ -185,7 +213,9 @@ fun MainScreen(
 @Composable
 private fun TopNavigationBar(
     onSearchClick: () -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onLogoutClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -212,9 +242,25 @@ private fun TopNavigationBar(
                 )
             }
             
+            IconButton(onClick = onSettingsClick) {
+                Text(
+                    text = "⚙️",
+                    fontSize = 20.sp,
+                    color = Color.White
+                )
+            }
+            
             IconButton(onClick = onProfileClick) {
                 Text(
                     text = "👤",
+                    fontSize = 20.sp,
+                    color = Color.White
+                )
+            }
+            
+            IconButton(onClick = onLogoutClick) {
+                Text(
+                    text = "🚪",
                     fontSize = 20.sp,
                     color = Color.White
                 )
@@ -330,6 +376,64 @@ private fun FeaturedContentHero(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MyListSection(
+    watchList: List<ContentItem>,
+    onContentClick: (ContentItem) -> Unit,
+    onShowDetails: (ContentItem) -> Unit,
+    onPlayContent: (ContentItem) -> Unit,
+    onToggleLike: (ContentItem) -> Unit,
+    onToggleWatchlist: (ContentItem) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "📋",
+                    fontSize = 20.sp
+                )
+                Text(
+                    text = "My List",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+            
+            Text(
+                text = "${watchList.size} ${if (watchList.size == 1) "item" else "items"}",
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+        }
+        
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(watchList) { item ->
+                EnhancedContentCard(
+                    content = item,
+                    onClick = { onContentClick(item) },
+                    onShowDetails = { onShowDetails(item) },
+                    onPlay = { onPlayContent(item) },
+                    onToggleLike = { onToggleLike(item) },
+                    onToggleWatchlist = { onToggleWatchlist(item) }
+                )
             }
         }
     }

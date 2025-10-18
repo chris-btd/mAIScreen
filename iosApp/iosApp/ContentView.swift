@@ -15,18 +15,41 @@ struct ContentView: View {
     @State private var currentScreen: AppScreen = .splash
     @State private var selectedTier: SubscriptionTier?
     @State private var selectedContent: ContentItem?
+    @StateObject private var authService = AuthService.shared
     
     var body: some View {
-        switch currentScreen {
+        Group {
+            switch currentScreen {
         case .splash:
-            SplashView {
-                currentScreen = .login
-            }
+            SplashView(
+                onSplashComplete: {
+                    // Check if user was found to be authenticated during splash
+                    if authService.isAuthenticated {
+                        print("🚀 iOS: User authenticated during splash, navigating to main screen")
+                        currentScreen = .main
+                    } else {
+                        print("🚀 iOS: User not authenticated, navigating to login screen")
+                        currentScreen = .login
+                    }
+                },
+                onAuthenticatedUserFound: { userEmail in
+                    print("🔐 iOS: Setting authenticated state for user: \(userEmail ?? "unknown")")
+                    authService.setAuthenticated(true, email: userEmail)
+                }
+            )
         case .login:
             LoginView(
                 onLoginClick: { email, password in
-                    // TODO: Implement login logic
-                    print("Login attempt: \(email)")
+                    print("🔑 iOS: Starting login for: \(email)")
+                    
+                    // Check if already authenticated first
+                    if authService.isAuthenticated {
+                        print("ℹ️ iOS: User already authenticated, skipping login")
+                        return
+                    }
+                    
+                    // Use AuthService to simulate login
+                    authService.simulateLogin(email: email, password: password)
                 },
                 onSignUpClick: {
                     currentScreen = .signUp
@@ -100,6 +123,10 @@ struct ContentView: View {
                     onToggleWatchlist: { content in
                         print("Toggle watchlist: \(content.title)")
                         // TODO: Update watchlist status
+                    },
+                    onLogoutClick: {
+                        print("🚪 iOS: Logout clicked")
+                        authService.logout()
                     }
                 )
             case .videoPlayer:
@@ -115,6 +142,16 @@ struct ContentView: View {
                         }
                     )
                 }
+            }
+        }
+        .onChange(of: authService.isAuthenticated) { isAuthenticated in
+            if isAuthenticated && currentScreen == .login {
+                print("🔐 iOS: User authenticated, navigating to main screen")
+                currentScreen = .main
+            } else if !isAuthenticated && currentScreen == .main {
+                print("🚪 iOS: User logged out, navigating to login screen")
+                currentScreen = .login
+            }
         }
     }
 }

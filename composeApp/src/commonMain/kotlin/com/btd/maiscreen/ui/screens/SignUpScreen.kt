@@ -22,11 +22,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.random.Random
+import com.btd.maiscreen.ui.components.ErrorDialog
 
 @Composable
 fun SignUpScreen(
-    onSignUpClick: (firstName: String, lastName: String, email: String, password: String) -> Unit,
-    onBackToLoginClick: () -> Unit
+    onSignUpClick: (firstName: String, lastName: String, email: String, password: String, birthdate: String) -> Unit,
+    onBackToLoginClick: () -> Unit,
+    isLoading: Boolean = false,
+    errorMessage: String? = null,
+    onErrorDismiss: () -> Unit = {}
 ) {
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
@@ -34,9 +38,54 @@ fun SignUpScreen(
     var confirmEmail by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var birthdate by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+    
+    // Function to format error messages
+    fun formatErrorMessage(error: String): String {
+        return when {
+            error.contains("Password did not conform with policy") -> {
+                when {
+                    error.contains("Password not long enough") -> "Password must be at least 8 characters long"
+                    error.contains("Password must have uppercase characters") -> "Password must contain uppercase letters"
+                    error.contains("Password must have lowercase characters") -> "Password must contain lowercase letters"
+                    error.contains("Password must have numeric characters") -> "Password must contain numbers"
+                    error.contains("Password must have symbol characters") -> "Password must contain special characters"
+                    else -> "Password does not meet security requirements"
+                }
+            }
+            error.contains("UsernameExistsException") -> "An account with this email already exists"
+            error.contains("InvalidParameterException") && error.contains("birthdate") -> "Please enter a valid birthdate in MM/DD/YYYY format"
+            error.contains("InvalidParameterException") -> "Please check your email format"
+            error.contains("SignUp is not permitted") -> "Sign-up is currently disabled. Please contact support."
+            else -> "Sign-up failed: ${error.take(100)}..."
+        }
+    }
+    
+    // Birthdate validation function
+    fun isValidBirthdate(date: String): Boolean {
+        if (date.isBlank()) return false
+        
+        // Check MM/DD/YYYY format
+        val regex = Regex("""^(0[1-9]|1[0-2])/(0[1-9]|[12]\d|3[01])/\d{4}$""")
+        if (!regex.matches(date)) return false
+        
+        // Parse and validate date
+        val parts = date.split("/")
+        if (parts.size != 3) return false
+        
+        val month = parts[0].toIntOrNull() ?: return false
+        val day = parts[1].toIntOrNull() ?: return false
+        val year = parts[2].toIntOrNull() ?: return false
+        
+        // Basic validation
+        if (month !in 1..12) return false
+        if (day !in 1..31) return false
+        if (year < 1900 || year > 2024) return false
+        
+        return true
+    }
     
     // Form validation
     val isFormValid = firstName.isNotBlank() && 
@@ -45,9 +94,11 @@ fun SignUpScreen(
                      confirmEmail.isNotBlank() && 
                      password.isNotBlank() && 
                      confirmPassword.isNotBlank() &&
+                     birthdate.isNotBlank() &&
                      email == confirmEmail &&
                      password == confirmPassword &&
-                     password.length >= 6
+                     password.length >= 6 &&
+                     isValidBirthdate(birthdate)
     
     val emailsMatch = email == confirmEmail || confirmEmail.isEmpty()
     val passwordsMatch = password == confirmPassword || confirmPassword.isEmpty()
@@ -208,6 +259,47 @@ fun SignUpScreen(
                 )
             }
             
+            // Birthdate Input
+            OutlinedTextField(
+                value = birthdate,
+                onValueChange = { 
+                    // Format input as MM/DD/YYYY
+                    val filtered = it.filter { char -> char.isDigit() || char == '/' }
+                    if (filtered.length <= 10) {
+                        birthdate = when (filtered.length) {
+                            3 -> if (filtered[2] != '/') "${filtered.substring(0, 2)}/${filtered[2]}" else filtered
+                            6 -> if (filtered[5] != '/') "${filtered.substring(0, 5)}/${filtered[5]}" else filtered
+                            else -> filtered
+                        }
+                    }
+                },
+                label = { Text("Birthdate", color = Color.White.copy(alpha = 0.7f)) },
+                placeholder = { Text("MM/DD/YYYY", color = Color.White.copy(alpha = 0.5f)) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true,
+                isError = birthdate.isNotBlank() && !isValidBirthdate(birthdate),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = if (birthdate.isBlank() || isValidBirthdate(birthdate)) Color.White else Color.Red,
+                    unfocusedBorderColor = if (birthdate.isBlank() || isValidBirthdate(birthdate)) Color.White.copy(alpha = 0.5f) else Color.Red.copy(alpha = 0.7f),
+                    cursorColor = Color.White,
+                    errorBorderColor = Color.Red,
+                    errorTextColor = Color.White
+                )
+            )
+            
+            // Birthdate validation message
+            if (birthdate.isNotBlank() && !isValidBirthdate(birthdate)) {
+                Text(
+                    text = "Please enter a valid date in MM/DD/YYYY format",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            
             // Password Input
             OutlinedTextField(
                 value = password,
@@ -293,8 +385,7 @@ fun SignUpScreen(
             Button(
                 onClick = {
                     if (isFormValid) {
-                        isLoading = true
-                        onSignUpClick(firstName, lastName, email, password)
+                        onSignUpClick(firstName, lastName, email, password, birthdate)
                     }
                 },
                 modifier = Modifier
@@ -337,6 +428,19 @@ fun SignUpScreen(
             }
             
             Spacer(modifier = Modifier.height(20.dp))
+        }
+        
+        // Error Dialog
+        errorMessage?.let { message ->
+            ErrorDialog(
+                title = "Sign Up Failed",
+                message = formatErrorMessage(message),
+                onDismiss = onErrorDismiss,
+                onRetry = {
+                    // Clear form for retry
+                    onErrorDismiss()
+                }
+            )
         }
     }
 }

@@ -1,10 +1,18 @@
 import SwiftUI
+import Combine
 
 struct SplashView: View {
     @State private var progress: Double = 0.0
     @State private var isComplete = false
     @State private var starOpacity: Double = 0.8
+    @State private var authCheckCompleted = false
     let onSplashComplete: () -> Void
+    let onAuthenticatedUserFound: ((String?) -> Void)?
+    
+    init(onSplashComplete: @escaping () -> Void, onAuthenticatedUserFound: ((String?) -> Void)? = nil) {
+        self.onSplashComplete = onSplashComplete
+        self.onAuthenticatedUserFound = onAuthenticatedUserFound
+    }
     
     // Define colors
     let navyBlue = Color(red: 0.106, green: 0.161, blue: 0.318) // #1B2951
@@ -72,6 +80,13 @@ struct SplashView: View {
                     Text("Loading... \(Int(progress * 100))%")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.7))
+                    
+                    // Authentication status text (for debugging)
+                    if progress > 0.5 {
+                        Text("Checking authentication...")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
                 }
             }
             .padding(.horizontal, 24)
@@ -83,16 +98,40 @@ struct SplashView: View {
     }
     
     private func startLoading() {
+        // Start authentication check in parallel with loading animation
+        AuthService.shared.checkAuthenticationStatus()
+        
+        // Observe authentication state changes
+        AuthService.shared.$isAuthenticated
+            .combineLatest(AuthService.shared.$userEmail)
+            .sink { [self] isAuthenticated, userEmail in
+                if isAuthenticated {
+                    print("✅ iOS: Authenticated user found during splash: \(userEmail ?? "unknown")")
+                    onAuthenticatedUserFound?(userEmail)
+                }
+                authCheckCompleted = true
+            }
+            .store(in: &cancellables)
+        
         // Animate progress from 0 to 1 over 2 seconds
         withAnimation(.easeInOut(duration: 2.0)) {
-            progress = 1.0
+            ƒ = 1.0
         }
         
-        // Complete splash after animation finishes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            onSplashComplete()
+        // Wait for authentication check to complete, then finish splash
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            // Wait a bit more if auth check hasn't completed
+            if !authCheckCompleted {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    onSplashComplete()
+                }
+            } else {
+                onSplashComplete()
+            }
         }
     }
+    
+    @State private var cancellables = Set<AnyCancellable>()
     
     private func startStarTwinkle() {
         withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {

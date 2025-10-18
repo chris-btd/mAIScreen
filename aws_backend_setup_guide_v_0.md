@@ -322,6 +322,373 @@ node tools/makeAudioMaster.mjs your-vod-bucket ASSET123   # if audio-only
 - **Frontend**: `hls.js`, React + shadcn/ui (for the toggle player)
 
 ---
+AI Film Platform — Data & API (MVP)
+
+This document defines the core data models, auth rules, and the edge API used to upload, review, and stream AI-generated content.
+
+MVP: what each model is for
+
+UserProfile – one row per user; display handle + prefs. id = Cognito sub.
+
+Entitlement – user’s tier (Free/Standard/Plus) and monthly minute quota.
+
+Program – a “title page”: movie, series, short, reel, or audio series.
+
+Episode – individual episodes (only for series).
+
+MediaAsset – S3 keys for master playlists/MP4/thumbs; transcode status; provenance hooks.
+
+Submission – creator uploads + metadata; drives review workflow.
+
+Review – moderation results (decision, rating, notes).
+
+Tag – genres/topics attached to programs.
+
+Enums
+enum Tier { FREE STANDARD PLUS }
+enum ContentKind { MOVIE SERIES EPISODE SHORT REEL AUDIO_SERIES }
+enum SubmissionStatus { DRAFT SUBMITTED IN_REVIEW CHANGES_REQUESTED APPROVED REJECTED PUBLISHED }
+enum ReviewDecision { APPROVE REJECT CHANGES_REQUESTED }
+enum MaturityRating { G PG PG13 R NC17 TVY TVG TVPG TV14 TVMA UNRATED }
+enum PromptPlatform { VEO3 RUNWAY PIKA MIDJOURNEY CUSTOM OTHER }
+
+GraphQL schema (paste into schema.graphql)
+
+Notes:
+
+@model automatically adds createdAt and updatedAt fields. Don’t redeclare them.
+
+id on UserProfile is the Cognito sub (see “UserProfile creation” below).
+
+Public read via provider: apiKey is optional; remove if you want “signed-in only” apps.
+
+type UserProfile
+@model
+@auth(rules: [
+{ allow: owner, ownerField: "id", identityClaim: "sub" },   # owner is the user whose sub == id
+{ allow: groups, groups: ["admin"], operations: [read, update, delete] }
+]) {
+id: ID!                 # must be set to Cognito sub
+handle: String
+avatarUrl: AWSURL
+bio: String
+entitlement: Entitlement @hasOne
+}
+
+type Entitlement
+@model
+@auth(rules: [
+{ allow: owner },
+{ allow: groups, groups: ["admin","moderator"], operations: [read, update] }
+]) {
+id: ID!
+userId: ID! @index(name: "byUser", queryField: "entitlementByUser")
+tier: Tier!
+minutesQuotaMonthly: Int!      # e.g., 30 / 75 / 150
+minutesUsedThisMonth: Int!
+renewsAt: AWSDateTime!
+}
+
+type Program
+@model
+@auth(rules: [
+{ allow: groups, groups: ["admin","moderator"] },                   # staff: full access
+{ allow: public, operations: [read], provider: apiKey },            # optional public read
+{ allow: owner, operations: [create, read, update] }                # owner edits until published
+]) {
+id: ID!
+kind: ContentKind!
+title: String!
+logline: String
+synopsis: String
+tags: [Tag] @manyToMany(relationName: "ProgramTags")
+posterKey: String
+heroKey: String
+maturityRating: MaturityRating
+isPublished: Boolean! @index(name: "byPublished")
+publishedAt: AWSDateTime
+owner: ID
+primaryAsset: MediaAsset @hasOne
+episodes: [Episode] @hasMany(indexName: "byProgram", fields: ["id"])
+}
+
+type Episode
+@model
+@auth(rules: [
+{ allow: groups, groups: ["admin","moderator"] },
+{ allow: owner, operations: [create, read, update] },
+{ allow: public, operations: [read], provider: apiKey }             # optional public read
+]) {
+id: ID!
+programId: ID! @index(name: "byProgram", sortKeyFields:["seasonNumber","episodeNumber"])
+program: Program @belongsTo(fields: ["programId"])
+seasonNumber: Int!
+episodeNumber: Int!
+title: String!
+synopsis: String
+runtimeSec: Int
+asset: MediaAsset @hasOne
+publishedAt: AWSDateTime
+}
+
+type MediaAsset
+@model
+@auth(rules: [
+{ allow: groups, groups: ["admin","moderator"] },
+{ allow: owner, operations: [create, read, update] },
+{ allow: public, operations: [read], provider: apiKey }             # safe if /assets gated by CloudFront
+]) {
+id: ID!
+assetId: String! @index(name: "byAssetId")                             # matches s3://.../assets/{assetId}/
+durationSec: Int
+width: Int
+height: Int
+hlsMasterKey: String               # e.g., assets/ASSET001/hls/master_free.m3u8
+audioHlsMasterKey: String          # e.g., assets/ASSET001/hls_audio/master_audio.m3u8
+mp4Key: String
+thumbsPrefix: String
+transcodeStatus: String            # QUEUED | PROCESSING | SUCCEEDED | ERROR
+mediaconvertJobId: String
+filmIdHash: String
+contentRootHash: String
+provenanceCID: String              # ipfs://...
+}
+
+type Submission
+@model
+@auth(rules: [
+{ allow: owner, operations: [create, read, update] },
+{ allow: groups, groups: ["admin","moderator"] }
+])
+@index(name: "byOwner", queryField: "submissionsByOwner", sortKeyFields:["createdAt"])
+@index(name: "byStatus", queryField: "submissionsByStatus") {
+id: ID!
+owner: ID!                     # Cognito sub
+status: SubmissionStatus!
+programDraftId: ID             # link to Program created on approval (optional)
+title: String!
+kind: ContentKind!             # MOVIE/SERIES/EPISODE/SHORT/REEL/AUDIO_SERIES
+runtimeSec: Int
+tierAtSubmission: Tier!
+promptPlatform: PromptPlatform!
+promptOrigin: String           # e.g., "Veo 3"
+promptTextHash: String         # sha256 of prompt (not raw text)
+toolsUsed: [String]
+sourceNotes: String
+uploadKey: String              # key only (uploads/ASSET001/original.mp4)
+assetId: String                # target assets/{assetId}/
+reviews: [Review] @hasMany(indexName: "bySubmission", fields: ["id"])
+}
+
+type Review
+@model
+@auth(rules: [
+{ allow: groups, groups: ["admin","moderator"] },
+{ allow: owner, operations: [read] }                                 # creator can read decisions
+])
+@index(name: "bySubmission", queryField: "reviewsBySubmission") {
+id: ID!
+submissionId: ID!
+submission: Submission @belongsTo(fields: ["submissionId"])
+reviewerId: ID!
+decision: ReviewDecision!
+maturityRating: MaturityRating
+notes: String
+}
+
+type Tag
+@model
+@auth(rules: [
+{ allow: public, operations: [read], provider: apiKey },
+{ allow: groups, groups: ["admin","moderator"] }
+]) {
+id: ID!
+name: String! @index(name: "byName")
+programs: [Program] @manyToMany(relationName: "ProgramTags")
+}
+
+Nice-to-have extensions
+type ViewingProgress
+@model
+@auth(rules:[{allow: owner},{allow: groups, groups:["admin","moderator"], operations:[read]}])
+@index(name:"byUserAndProgram", queryField:"progressByUserProgram", sortKeyFields:["programId"]) {
+id: ID!
+userId: ID!
+programId: ID!
+episodeId: ID
+positionSec: Int!
+updatedAt: AWSDateTime
+}
+
+type UserRating
+@model
+@auth(rules:[{allow: owner},{allow: groups, groups:["admin","moderator"], operations:[read]}])
+@index(name:"byProgram", queryField:"ratingsByProgram") {
+id: ID!
+programId: ID!
+userId: ID!
+score: Int!        # 1..5
+createdAt: AWSDateTime
+}
+
+type Watchlist
+@model
+@auth(rules:[{allow: owner}])
+@index(name:"byUser", queryField:"watchlistByUser") {
+id: ID!
+userId: ID!
+programId: ID!
+createdAt: AWSDateTime
+}
+
+type Collection
+@model
+@auth(rules:[
+{allow: groups, groups:["admin","moderator"]},
+{allow: public, operations:[read], provider: apiKey}
+]) {
+id: ID!
+title: String!
+slug: String! @index(name:"bySlug")
+items: [Program] @manyToMany(relationName: "CollectionPrograms")
+published: Boolean!
+order: Int
+}
+
+Auth & groups
+
+Cognito groups: admin, moderator, creator.
+
+Public read (optional): keep on Program/Episode/Tag/Collection or remove for a closed app.
+
+Owner rules: creators see/edit their own Program (pre-publish) and their Submission; staff can moderate.
+
+UserProfile creation pattern
+
+AppSync doesn’t auto-create a profile when a user signs up. Choose one:
+
+A) Create on first sign-in (simple)
+
+After login, get sub.
+
+getUserProfile(id: sub); if none, createUserProfile({ id: sub, handle }).
+
+B) Post-Confirmation trigger (hands-off)
+
+Add a Cognito Post Confirmation Lambda that calls createUserProfile with id = event.request.userAttributes.sub.
+
+Keep id = sub. It makes owner auth trivial and joins clean.
+
+Streaming: how the models tie to the edge
+
+MediaAsset.assetId == folder under s3://<bucket>/assets/{assetId}/....
+
+Play Lambda checks Entitlement.tier, signs CloudFront cookies scoped to /assets/{assetId}/*, and returns the manifestUrl (free/standard/plus or audio-only).
+
+Upload-URL Lambda returns a pre-signed PUT URL for uploads/{assetId}/original.mp4 (or similar), so clients upload directly to S3 without exposing the bucket.
+
+Edge/API wiring checklist
+API Gateway (HTTP API v2)
+
+Routes
+
+GET /api/play/{assetId} → Lambda play
+
+GET /api/upload-url → Lambda upload-url
+
+POST /api/submit → Lambda submit (optional)
+
+JWT Authorizer (Cognito)
+
+Issuer: https://cognito-idp.<region>.amazonaws.com/<userPoolId>
+
+Audience: your App Client ID(s)
+
+Attach to the routes; set Authorization = Required.
+
+Stage: $default with Auto-deploy ON.
+
+Lambda Set-Cookie (HTTP API v2)
+
+Return a cookies: [] array; API GW will emit multiple Set-Cookie headers.
+
+CloudFront
+
+Origin A (S3 + OAC) → /assets/*
+
+Restrict viewer access: Yes
+
+Trusted key groups: your key group (public key)
+
+Origin B (API Gateway HTTP API) → /api/*
+
+Restrict viewer access: No
+
+Cache policy: Managed – CachingDisabled
+
+Origin request policy: Managed – AllViewerExceptHostHeader
+
+Allowed methods: GET/HEAD (+ POST/OPTIONS if needed)
+
+Lambdas (contracts)
+
+play → returns cookies + manifest
+
+{
+"ok": true,
+"assetId": "ASSET001",
+"tier": "free|standard|plus",
+"mode": "video|audio",
+"expiresAt": "2025-01-01T00:00:00Z",
+"manifestUrl": "https://<CF_DOMAIN>/assets/ASSET001/hls/master_free.m3u8"
+}
+
+
+Sets three cookies: CloudFront-Policy, CloudFront-Signature, CloudFront-Key-Pair-Id (Secure; HttpOnly; SameSite=Lax).
+
+upload-url → returns presigned PUT
+
+{
+"method": "PUT",
+"uploadUrl": "https://<bucket>.s3.amazonaws.com/uploads/ASSET001/....?X-Amz-Algorithm=...",
+"s3Key": "uploads/ASSET001/1707090000_original.mp4",
+"expiresInSec": 900,
+"requiredHeaders": { "Content-Type": "video/mp4" }
+}
+
+Minimal environment variables
+
+play: CF_DOMAIN, CF_KEY_PAIR_ID, CF_PRIVATE_KEY (or CF_PRIVATE_KEY_SECRET_ARN), COOKIE_TTL_SEC
+
+upload-url: S3_BUCKET, UPLOAD_URL_TTL
+
+IAM (least privilege)
+
+play: if using Secrets Manager
+secretsmanager:GetSecretValue on your private key secret.
+
+upload-url:
+s3:PutObject on arn:aws:s3:::<bucket>/uploads/*
+(add multipart permissions later if needed).
+
+Test quickly
+# 1) Call play THROUGH CloudFront; you should see 3 Set-Cookie headers:
+curl -s -D - "https://<CF_DOMAIN>/api/play/ASSET001?tier=free" -o /dev/null | grep -i '^Set-Cookie:'
+
+# 2) Then the manifest should be 200 with those cookies:
+curl -I "https://<CF_DOMAIN>/assets/ASSET001/hls/master_free.m3u8" \
+-H 'Cookie: CloudFront-Policy=...; CloudFront-Signature=...; CloudFront-Key-Pair-Id=KXXXX'
+
+Security notes
+
+Keep cookie TTLs short (e.g., 1h) and scope the policy to /assets/{assetId}/*.
+
+Store the CloudFront private key in Secrets Manager for prod; env var is OK for dev.
+
+Add WAF to the CloudFront distribution; enable logging.
+
+For web, CORS should allow only your app’s origins and credentials.
+
 
 ### Success Criteria (sanity checklist)
 - ✅ CloudFront serves `/assets/ASSET123/hls/master_free.m3u8` but **only** with signed cookies.

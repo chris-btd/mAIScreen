@@ -26,12 +26,14 @@ import kotlin.random.Random
 @Composable
 fun LoginScreen(
     onLoginClick: (email: String, password: String) -> Unit,
-    onSignUpClick: () -> Unit
+    onSignUpClick: () -> Unit,
+    errorMessage: String? = null,
+    onErrorDismiss: () -> Unit = {},
+    isLoading: Boolean = false
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
     
     // Define colors
     val navyBlue = Color(0xFF1B2951)
@@ -92,7 +94,7 @@ fun LoginScreen(
             )
             
             Text(
-                text = "Welcome back!",
+                text = "Sign in to continue",
                 fontSize = 18.sp,
                 color = Color.White.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center
@@ -154,7 +156,6 @@ fun LoginScreen(
             Button(
                 onClick = {
                     if (email.isNotBlank() && password.isNotBlank()) {
-                        isLoading = true
                         onLoginClick(email, password)
                     }
                 },
@@ -177,7 +178,7 @@ fun LoginScreen(
                     )
                 } else {
                     Text(
-                        text = "Login",
+                        text = "Sign In",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -241,6 +242,33 @@ fun LoginScreen(
                     color = Color.White.copy(alpha = 0.8f)
                 )
             }
+        }
+        
+        // Error Dialog
+        errorMessage?.let { error ->
+            AlertDialog(
+                onDismissRequest = onErrorDismiss,
+                title = {
+                    Text(
+                        text = "Login Error",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Red
+                    )
+                },
+                text = {
+                    Text(
+                        text = error,
+                        color = Color.Black
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = onErrorDismiss
+                    ) {
+                        Text("OK", color = Color.Red)
+                    }
+                }
+            )
         }
     }
 }

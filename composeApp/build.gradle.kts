@@ -29,6 +29,12 @@ kotlin {
             implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
             implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
             implementation(libs.okhttp)
+            implementation(libs.appauth)
+            implementation("androidx.browser:browser:1.7.0")
+            
+            // AWS Amplify for Cognito User Pool management
+            implementation("com.amplifyframework:aws-auth-cognito:2.14.5")
+            implementation("com.amplifyframework:core:2.14.5")
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -62,10 +68,27 @@ android {
         versionCode = 1
         versionName = "1.0"
         
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
         // Build configuration for sensitive values
         buildConfigField("String", "CLOUDFRONT_DOMAIN", "\"d2ofvyi6ramrc2.cloudfront.net\"")
         buildConfigField("String", "TEST_EMAIL", "\"test@test.com\"")
         buildConfigField("String", "TEST_PASSWORD", "\"1111111\"")
+        
+        // Demo video URLs for testing
+        buildConfigField("String", "DEMO_VIDEO_1", "\"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4\"")
+        buildConfigField("String", "DEMO_VIDEO_2", "\"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4\"")
+        buildConfigField("String", "DEMO_VIDEO_3", "\"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4\"")
+        
+        // AWS Cognito Configuration
+        buildConfigField("String", "COGNITO_ISSUER_URI", "\"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_rty4feGNd\"")
+        buildConfigField("String", "COGNITO_CLIENT_ID", "\"11jljm542ir3b5ejqqeu9nn20q\"")
+        buildConfigField("String", "COGNITO_REDIRECT_URI", "\"maiscreen.auth://callback\"")
+        buildConfigField("String", "COGNITO_LOGOUT_URI", "\"maiscreen.auth://logout\"")
+        buildConfigField("String", "COGNITO_SCOPE", "\"email openid phone\"")
+        
+        // Manifest placeholders for Cognito redirect handling
+        manifestPlaceholders["appAuthRedirectScheme"] = "maiscreen.auth"
     }
     packaging {
         resources {
@@ -88,6 +111,14 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
+    
+    // Android Test Dependencies
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.testExt.junit)
+    androidTestImplementation(libs.kotlin.testJunit)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.9.0")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
 }
 
 compose.desktop {

@@ -53,7 +53,8 @@ fun SubscriptionScreen(
                 "Stream to only one device at a time",
                 "Community Support",
                 "720p and 1080p resolution streaming",
-                "The ability to submit up to 30 minutes of your own AI generated content to be featured on our platform. Click rules guide below"
+                "The ability to submit up to 30 minutes of your own AI generated content to be featured on our platform. Click rules guide below",
+                "⚠️ Free tier minutes do not roll over each month"
             )
         ),
         SubscriptionTier(
@@ -65,7 +66,8 @@ fun SubscriptionScreen(
                 "Stream on up to 3 devices simultaneously",
                 "Community Support",
                 "1080p resolution streaming",
-                "The ability to submit up to 1 hour and 15 minutes of your own AI generated content to be featured on our platform. Click rules guide below"
+                "The ability to submit up to 1 hour and 15 minutes of your own AI generated content to be featured on our platform. Click rules guide below",
+                "✨ Unused minutes roll over to the next month!"
             ),
             isPopular = true
         ),
@@ -78,7 +80,8 @@ fun SubscriptionScreen(
                 "Stream on up to 3 devices simultaneously",
                 "Community Support",
                 "4K resolution streaming",
-                "The ability to submit up to 2 hours and 30 minutes of your own AI generated content to be featured on our platform. Click rules guide below"
+                "The ability to submit up to 2 hours and 30 minutes of your own AI generated content to be featured on our platform. Click rules guide below",
+                "✨ Unused minutes roll over to the next month!"
             )
         )
     )
