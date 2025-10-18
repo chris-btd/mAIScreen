@@ -8,7 +8,109 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
 }
+// ======== Gradle Kotlin DSL equivalents ========
 
+// ---- Properties (from gradle.properties) ----
+val awsRegion: String = (findProperty("awsRegion") as String?) ?: "us-east-1"
+val appSyncApiId: String = (findProperty("appSyncApiId") as String?) ?: ""
+val lambdaFunctions: List<String> =
+    ((findProperty("lambdaFunctions") as String?) ?: "")
+        .split(",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+
+val artifactOutDir: String = (findProperty("artifactOutDir") as String?) ?: "build/artifacts"
+
+// ---- OS shell helper ----
+val isWindows = System.getProperty("os.name").lowercase().contains("win")
+fun shell(cmd: String): List<String> =
+    if (isWindows) listOf("powershell", "-Command", cmd)
+    else listOf("bash", "-lc", cmd)
+
+// ---- Tasks ----
+tasks.register("prepareArtifactDirs") {
+    doLast {
+        file("$artifactOutDir/graphql").mkdirs()
+        file("$artifactOutDir/lambdas").mkdirs()
+    }
+}
+
+tasks.register<Exec>("downloadAppSyncSchema") {
+    dependsOn("prepareArtifactDirs")
+    if (appSyncApiId.isBlank()) {
+        throw GradleException("Set appSyncApiId in gradle.properties")
+    }
+    val out = "$artifactOutDir/graphql/schema.graphql"
+
+    // Use a shell so output redirection ( > file ) works
+    commandLine(
+        shell(
+            """
+            aws appsync get-introspection-schema `
+              --api-id $appSyncApiId `
+              --format SDL `
+              --region $awsRegion `
+              --output text > $out
+            """.trimIndent().replace("`", if (isWindows) "`" else "\\")
+        )
+    )
+
+    doLast {
+        println("✅ AppSync schema downloaded → $out")
+    }
+}
+
+tasks.register("downloadLambda") {
+    dependsOn("prepareArtifactDirs")
+    doLast {
+        val lambdaName = (findProperty("lambdaName") as String?)
+            ?: throw GradleException("Usage: ./gradlew downloadLambda -PlambdaName=<FUNCTION_NAME>")
+
+        val outZip = "$artifactOutDir/lambdas/$lambdaName.zip"
+
+        // 1) Get signed URL for the deployed artifact
+        // 2) Download with curl
+        val cmd = """
+            set -e
+            URL=$(aws lambda get-function \
+                --function-name $lambdaName \
+                --region $awsRegion \
+                --query 'Code.Location' \
+                --output text)
+            echo "Downloading $lambdaName from: ${'$'}URL"
+            ${if (isWindows) "curl.exe -L" else "curl -L"} "${'$'}URL" -o $outZip
+        """.trimIndent()
+
+        exec { commandLine(shell(cmd)) }
+        println("✅ Lambda downloaded → $outZip")
+    }
+}
+
+tasks.register("downloadAllLambdas") {
+    dependsOn("prepareArtifactDirs")
+    doLast {
+        if (lambdaFunctions.isEmpty()) {
+            throw GradleException("Set lambdaFunctions in gradle.properties (comma-separated)")
+        }
+
+        lambdaFunctions.forEach { name ->
+            println("▶ Downloading $name ...")
+            val outZip = "$artifactOutDir/lambdas/$name.zip"
+            val cmd = """
+                set -e
+                URL=$(aws lambda get-function \
+                    --function-name $name \
+                    --region $awsRegion \
+                    --query 'Code.Location' \
+                    --output text)
+                ${if (isWindows) "curl.exe -L" else "curl -L"} "${'$'}URL" -o $outZip
+            """.trimIndent()
+
+            exec { commandLine(shell(cmd)) }
+            println("✅ $name → $outZip")
+        }
+    }
+}
 kotlin {
     androidTarget {
         compilerOptions {
