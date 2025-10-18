@@ -1,0 +1,23 @@
+# .github/workflows/iac-scan.yml
+name: IaC Scan
+on: [pull_request, push]
+
+jobs:
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: cloudformation,serverless,terraform # keep relevant ones
+          soft_fail: false
+
+  cfnnag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan CloudFormation
+        run: |
+          gem install cfn-nag
+          cfn_nag_scan --input-path infra/ # adjust path

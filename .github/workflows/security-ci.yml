@@ -1,0 +1,55 @@
+# .github/workflows/security-ci.yml
+name: Security CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: "13 3 * * *"   # daily
+
+jobs:
+  codeql:
+    uses: github/codeql-action/.github/workflows/codeql.yml@v3
+    with:
+      languages: javascript # add: python, java, swift, kotlin if needed
+
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/ci
+            p/javascript
+            p/nodejs
+            p/security-audit
+          generateSarif: true
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+  deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Node (Lambdas)
+      - name: Audit Node deps
+        run: |
+          npm -v
+          npm i -g npm@latest || true
+          npm ci --ignore-scripts || true
+          npm audit --omit=dev || true
+      # Optional: Snyk (requires token)
+      # - uses: snyk/actions/node@master
+      #   with: {command: test}
+      #   env: { SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }} }
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # optional
