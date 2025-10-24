@@ -1,6 +1,7 @@
 package com.btd.maiscreen.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,7 +21,8 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     onTogglePlaybackMode: (Boolean) -> Unit = {},
     isLocalPlaybackEnabled: Boolean = false,
-    onPurchaseMinutesClick: () -> Unit = {}
+    onPurchaseMinutesClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -284,6 +286,48 @@ fun SettingsScreen(
                         fontSize = 14.sp,
                         color = Color.Gray,
                         modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            }
+            
+            // Account Actions Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Account Actions",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E3A8A)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Logout option
+                    Text(
+                        text = "Logout",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFDC2626),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onLogoutClick)
+                            .padding(vertical = 12.dp)
+                    )
+                    
+                    Text(
+                        text = "Sign out of your account",
+                        fontSize = 12.sp,
+                        color = Color.Gray
                     )
                 }
             }

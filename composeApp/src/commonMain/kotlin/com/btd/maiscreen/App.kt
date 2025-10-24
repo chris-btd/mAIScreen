@@ -22,6 +22,7 @@ import com.btd.maiscreen.ui.screens.VideoPlayerScreen
 import com.btd.maiscreen.ui.screens.SettingsScreen
 import com.btd.maiscreen.ui.screens.PurchaseMinutesScreen
 import com.btd.maiscreen.ui.screens.ProfileScreen
+import com.btd.maiscreen.ui.screens.UploadTemplateScreen
 import com.btd.maiscreen.ui.screens.ContentItem
 import com.btd.maiscreen.config.AppSettings
 import com.btd.maiscreen.viewmodel.AppViewModel
@@ -34,7 +35,7 @@ fun App() {
         // Initialize ViewModels
         val appViewModel = remember { AppViewModel() }
         val profileViewModel = remember { ProfileViewModel() }
-        
+
         var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
         var selectedTier by remember { mutableStateOf<com.btd.maiscreen.ui.screens.SubscriptionTier?>(null) }
         var selectedContent by remember { mutableStateOf<ContentItem?>(null) }
@@ -231,6 +232,10 @@ fun App() {
                             println("Settings clicked")
                             currentScreen = AppScreen.Settings
                         },
+                        onUploadClick = {
+                            println("Upload clicked")
+                            currentScreen = AppScreen.UploadTemplate
+                        },
                         onContentClick = { content ->
                             println("Content clicked: ${content.title}")
                             // TODO: Navigate to content player
@@ -238,6 +243,8 @@ fun App() {
                         onPlayContent = { content ->
                             println("Play content: ${content.title}")
                             selectedContent = content
+                            // Add to recently watched
+                            appViewModel.addToRecentlyWatched(content)
                             currentScreen = AppScreen.VideoPlayer
                         },
                         onToggleLike = { content ->
@@ -247,7 +254,8 @@ fun App() {
                         onToggleWatchlist = { content ->
                             println("Toggle watchlist: ${content.title}")
                             // TODO: Update watchlist status
-                        }
+                        },
+                        recentlyWatched = appViewModel.recentlyWatchedContent
                     )
                 }
                 AppScreen.VideoPlayer -> {
@@ -275,6 +283,11 @@ fun App() {
                         isLocalPlaybackEnabled = AppSettings.isLocalPlaybackEnabled,
                         onPurchaseMinutesClick = {
                             currentScreen = AppScreen.PurchaseMinutes
+                        },
+                        onLogoutClick = {
+                            println("🚪 Logout clicked from settings")
+                            AuthManager.logout()
+                            AppAuthState.logout()
                         }
                     )
                 }
@@ -290,6 +303,18 @@ fun App() {
                         },
                         onBackClick = {
                             currentScreen = AppScreen.Profile
+                        }
+                    )
+                }
+                AppScreen.UploadTemplate -> {
+                    UploadTemplateScreen(
+                        onBackClick = {
+                            currentScreen = AppScreen.Main
+                        },
+                        onNextClick = { type, subType ->
+                            println("📤 Upload template selected: $type - $subType")
+                            // TODO: Navigate to next step in upload flow
+                            currentScreen = AppScreen.Main
                         }
                     )
                 }
@@ -373,5 +398,6 @@ enum class AppScreen {
     VideoPlayer,
     Settings,
     PurchaseMinutes,
+    UploadTemplate,
     Profile
 }

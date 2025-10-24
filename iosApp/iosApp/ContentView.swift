@@ -9,12 +9,15 @@ enum AppScreen {
     case payment
     case main
     case videoPlayer
+    case settings
+    case uploadTemplate
 }
 
 struct ContentView: View {
     @State private var currentScreen: AppScreen = .splash
     @State private var selectedTier: SubscriptionTier?
     @State private var selectedContent: ContentItem?
+    @State private var recentlyWatched: [ContentItem] = []
     @StateObject private var authService = AuthService.shared
     
     var body: some View {
@@ -107,6 +110,14 @@ struct ContentView: View {
                         print("Search clicked")
                         // TODO: Navigate to search screen
                     },
+                    onSettingsClick: {
+                        print("⚙️ Settings clicked")
+                        currentScreen = .settings
+                    },
+                    onUploadClick: {
+                        print("📤 Upload clicked")
+                        currentScreen = .uploadTemplate
+                    },
                     onContentClick: { content in
                         print("Content clicked: \(content.title)")
                         // TODO: Navigate to content player
@@ -114,6 +125,8 @@ struct ContentView: View {
                     onPlayContent: { content in
                         print("Play content: \(content.title)")
                         selectedContent = content
+                        // Add to recently watched
+                        addToRecentlyWatched(content)
                         currentScreen = .videoPlayer
                     },
                     onToggleLike: { content in
@@ -124,10 +137,7 @@ struct ContentView: View {
                         print("Toggle watchlist: \(content.title)")
                         // TODO: Update watchlist status
                     },
-                    onLogoutClick: {
-                        print("🚪 iOS: Logout clicked")
-                        authService.logout()
-                    }
+                    recentlyWatched: recentlyWatched
                 )
             case .videoPlayer:
                 if let content = selectedContent {
@@ -142,6 +152,27 @@ struct ContentView: View {
                         }
                     )
                 }
+            case .settings:
+                SettingsView(
+                    onBackClick: {
+                        currentScreen = .main
+                    },
+                    onLogoutClick: {
+                        print("🚪 iOS: Logout clicked from settings")
+                        authService.logout()
+                    }
+                )
+            case .uploadTemplate:
+                UploadTemplateView(
+                    onBackClick: {
+                        currentScreen = .main
+                    },
+                    onNextClick: { type, subType in
+                        print("📤 iOS: Upload template selected: \(type) - \(subType)")
+                        // TODO: Navigate to next step in upload flow
+                        currentScreen = .main
+                    }
+                )
             }
         }
         .onChange(of: authService.isAuthenticated) { isAuthenticated in
@@ -153,6 +184,22 @@ struct ContentView: View {
                 currentScreen = .login
             }
         }
+    }
+    
+    // Helper function to add content to recently watched
+    private func addToRecentlyWatched(_ content: ContentItem) {
+        // Remove if already exists to avoid duplicates
+        recentlyWatched.removeAll { $0.id == content.id }
+        
+        // Add to the beginning
+        recentlyWatched.insert(content, at: 0)
+        
+        // Keep only the last 10 items
+        if recentlyWatched.count > 10 {
+            recentlyWatched = Array(recentlyWatched.prefix(10))
+        }
+        
+        print("📺 iOS: Added to recently watched: \(content.title)")
     }
 }
 

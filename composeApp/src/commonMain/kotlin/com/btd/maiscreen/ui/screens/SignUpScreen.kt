@@ -145,6 +145,24 @@ fun SignUpScreen(
             }
         }
         
+        // Back Button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp, start = 16.dp)
+        ) {
+            TextButton(
+                onClick = onBackToLoginClick,
+                enabled = !isLoading
+            ) {
+                Text(
+                    text = "← Back",
+                    fontSize = 17.sp,
+                    color = Color.White
+                )
+            }
+        }
+        
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp),

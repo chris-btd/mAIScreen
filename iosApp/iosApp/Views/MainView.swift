@@ -28,14 +28,17 @@ struct ContentCategory: Identifiable {
 struct MainView: View {
     let onProfileClick: () -> Void
     let onSearchClick: () -> Void
+    let onSettingsClick: () -> Void
+    let onUploadClick: () -> Void
     let onContentClick: (ContentItem) -> Void
     let onPlayContent: (ContentItem) -> Void
     let onToggleLike: (ContentItem) -> Void
     let onToggleWatchlist: (ContentItem) -> Void
-    let onLogoutClick: (() -> Void)?
+    let recentlyWatched: [ContentItem]
     
     @State private var showDetailsSheet = false
     @State private var selectedContent: ContentItem?
+    @State private var showDrawer = false
     
     let navyBlue = Color(red: 0.106, green: 0.161, blue: 0.318)
     let black = Color.black
@@ -140,7 +143,7 @@ struct MainView: View {
                     TopNavigationBarView(
                         onSearchClick: onSearchClick,
                         onProfileClick: onProfileClick,
-                        onLogoutClick: onLogoutClick
+                        onMenuClick: { showDrawer = true }
                     )
                     
                     // Featured Content Hero Section
@@ -148,6 +151,21 @@ struct MainView: View {
                         content: featuredContent,
                         onPlayClick: { onContentClick(featuredContent) }
                     )
+                    
+                    // Recently Watched Section (only show if there are items)
+                    if !recentlyWatched.isEmpty {
+                        RecentlyWatchedSectionView(
+                            recentlyWatched: recentlyWatched,
+                            onContentClick: onContentClick,
+                            onShowDetails: { content in
+                                selectedContent = content
+                                showDetailsSheet = true
+                            },
+                            onPlayContent: onPlayContent,
+                            onToggleLike: onToggleLike,
+                            onToggleWatchlist: onToggleWatchlist
+                        )
+                    }
                     
                     // Content Categories
                     ForEach(contentCategories) { category in
@@ -185,28 +203,63 @@ struct MainView: View {
                 )
             }
         }
+        .overlay(
+            // Sliding Drawer
+            Group {
+                if showDrawer {
+                    SlidingDrawerView(
+                        isShowing: $showDrawer,
+                        onSettingsClick: {
+                            showDrawer = false
+                            onSettingsClick()
+                        },
+                        onUploadClick: {
+                            showDrawer = false
+                            onUploadClick()
+                        }
+                    )
+                }
+            }
+        )
     }
 }
 
 struct TopNavigationBarView: View {
     let onSearchClick: () -> Void
     let onProfileClick: () -> Void
-    let onLogoutClick: (() -> Void)?
-    
-    init(onSearchClick: @escaping () -> Void, onProfileClick: @escaping () -> Void, onLogoutClick: (() -> Void)? = nil) {
-        self.onSearchClick = onSearchClick
-        self.onProfileClick = onProfileClick
-        self.onLogoutClick = onLogoutClick
-    }
+    let onMenuClick: () -> Void
     
     var body: some View {
         HStack {
-            Text("mAIScreen")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(.white)
+            // Left side: Profile image + Title
+            HStack(spacing: 12) {
+                // Circular profile image button
+                Button(action: onMenuClick) {
+                    ZStack {
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color(red: 0.4, green: 0.495, blue: 0.918),
+                                Color(red: 0.463, green: 0.294, blue: 0.635)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                        
+                        Text("👤")
+                            .font(.system(size: 20))
+                    }
+                }
+                
+                Text("mAIScreen")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+            }
             
             Spacer()
             
+            // Right side: Search and Profile icons
             HStack(spacing: 16) {
                 Button(action: onSearchClick) {
                     Image(systemName: "magnifyingglass")
@@ -215,17 +268,8 @@ struct TopNavigationBarView: View {
                 }
                 
                 Button(action: onProfileClick) {
-                    Image(systemName: "person.circle")
+                    Text("📊")
                         .font(.system(size: 20))
-                        .foregroundColor(.white)
-                }
-                
-                if let onLogoutClick = onLogoutClick {
-                    Button(action: onLogoutClick) {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white)
-                    }
                 }
             }
         }
@@ -312,6 +356,49 @@ struct FeaturedContentHeroView: View {
             }
         }
         .padding(.horizontal, 24)
+    }
+}
+
+struct RecentlyWatchedSectionView: View {
+    let recentlyWatched: [ContentItem]
+    let onContentClick: (ContentItem) -> Void
+    let onShowDetails: (ContentItem) -> Void
+    let onPlayContent: (ContentItem) -> Void
+    let onToggleLike: (ContentItem) -> Void
+    let onToggleWatchlist: (ContentItem) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("🕐")
+                    .font(.system(size: 20))
+                Text("Recently Watched")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Text("\(recentlyWatched.count) \(recentlyWatched.count == 1 ? "video" : "videos")")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(.horizontal, 24)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(recentlyWatched) { item in
+                        ContentCardView(
+                            content: item,
+                            onClick: { onShowDetails(item) },
+                            onPlay: { onPlayContent(item) },
+                            onToggleLike: { onToggleLike(item) },
+                            onToggleWatchlist: { onToggleWatchlist(item) }
+                        )
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+        }
     }
 }
 
@@ -676,9 +763,121 @@ struct ContentDetailsView: View {
         },
         onToggleWatchlist: { content in
             print("Toggle watchlist: \(content.title)")
-        },
-        onLogoutClick: {
-            print("Logout clicked")
         }
     )
+}
+
+struct SlidingDrawerView: View {
+    @Binding var isShowing: Bool
+    let onSettingsClick: () -> Void
+    let onUploadClick: () -> Void
+    
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Dark overlay background
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation {
+                        isShowing = false
+                    }
+                }
+            
+            // Drawer panel
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Header with profile
+                    VStack(spacing: 12) {
+                        // Profile image
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.2))
+                                .frame(width: 80, height: 80)
+                            
+                            Text("👤")
+                                .font(.system(size: 40))
+                        }
+                        
+                        Text("My Account")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
+                    .padding(.horizontal, 24)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color(red: 0.4, green: 0.495, blue: 0.918),
+                                Color(red: 0.463, green: 0.294, blue: 0.635)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    
+                    Spacer()
+                        .frame(height: 24)
+                    
+                    // Menu items
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Upload option
+                        Button(action: onUploadClick) {
+                            HStack(spacing: 16) {
+                                Text("📤")
+                                    .font(.system(size: 24))
+                                
+                                Text("Upload")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                            .padding(.horizontal, 24)
+                        
+                        // Settings option
+                        Button(action: onSettingsClick) {
+                            HStack(spacing: 16) {
+                                Text("⚙️")
+                                    .font(.system(size: 24))
+                                
+                                Text("Settings")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                            .padding(.horizontal, 24)
+                    }
+                    
+                    Spacer()
+                    
+                    // Footer
+                    Text("mAIScreen v1.0.0")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 24)
+                }
+                .frame(width: 280)
+                .frame(maxHeight: .infinity)
+                .background(Color(red: 0.106, green: 0.161, blue: 0.318))
+                
+                Spacer()
+            }
+        }
+        .transition(.move(edge: .leading))
+    }
 }

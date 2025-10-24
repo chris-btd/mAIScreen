@@ -23,6 +23,7 @@ fun VideoPlayerScreen(
 ) {
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showReportDialog by remember { mutableStateOf(false) }
     
     // Handle system back button to prevent app exit on Android
     OnBackPressed(onBackClick)
@@ -43,12 +44,15 @@ fun VideoPlayerScreen(
             }
         )
         
-        // Close button overlay (top-left) - Larger and more accessible
-        Box(
+        // Top controls overlay
+        Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp)
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            // Close button (top-left)
             IconButton(
                 onClick = {
                     println("🔙 Close button clicked!")
@@ -73,6 +77,25 @@ fun VideoPlayerScreen(
                     color = Color.White,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
+                )
+            }
+            
+            // Report/Flag button (top-right)
+            IconButton(
+                onClick = {
+                    println("🚩 Report button clicked!")
+                    showReportDialog = true
+                },
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.9f),
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+            ) {
+                Text(
+                    text = "🚩",
+                    fontSize = 28.sp
                 )
             }
         }
@@ -176,7 +199,132 @@ fun VideoPlayerScreen(
                 }
             }
         }
+        
+        // Report Dialog
+        if (showReportDialog) {
+            ReportVideoDialog(
+                contentTitle = content.title,
+                onDismiss = { showReportDialog = false },
+                onReportSubmit = { reason, details ->
+                    println("🚩 Report submitted for '${content.title}': $reason - $details")
+                    // TODO: Send report to backend
+                    showReportDialog = false
+                }
+            )
+        }
     }
+}
+
+@Composable
+private fun ReportVideoDialog(
+    contentTitle: String,
+    onDismiss: () -> Unit,
+    onReportSubmit: (reason: String, details: String) -> Unit
+) {
+    var selectedReason by remember { mutableStateOf("") }
+    var additionalDetails by remember { mutableStateOf("") }
+    
+    val reportReasons = listOf(
+        "Inappropriate Content",
+        "Copyright Violation",
+        "Misleading or Spam",
+        "Violence or Harmful Content",
+        "Hate Speech",
+        "Other"
+    )
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "🚩",
+                    fontSize = 24.sp
+                )
+                Text(
+                    text = "Report Video",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Report: \"$contentTitle\"",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                Text(
+                    text = "Why are you reporting this video?",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                // Report reasons
+                reportReasons.forEach { reason ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedReason = reason }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = selectedReason == reason,
+                            onClick = { selectedReason = reason }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = reason,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Additional details
+                OutlinedTextField(
+                    value = additionalDetails,
+                    onValueChange = { additionalDetails = it },
+                    label = { Text("Additional details (optional)") },
+                    placeholder = { Text("Provide more information...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (selectedReason.isNotEmpty()) {
+                        onReportSubmit(selectedReason, additionalDetails)
+                    }
+                },
+                enabled = selectedReason.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFDC2626)
+                )
+            ) {
+                Text("Submit Report")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

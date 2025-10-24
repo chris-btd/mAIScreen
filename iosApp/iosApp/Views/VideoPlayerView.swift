@@ -10,6 +10,7 @@ struct VideoPlayerView: View {
     @State private var player: AVPlayer?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var showReportSheet = false
     
     var body: some View {
         ZStack {
@@ -65,20 +66,31 @@ struct VideoPlayerView: View {
                 .padding()
             }
             
-            // Back button overlay
+            // Top controls overlay
             VStack {
                 HStack {
+                    // Close button (top-left)
                     Button(action: onDismiss) {
                         Image(systemName: "xmark")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(Color.black.opacity(0.5))
+                            .frame(width: 48, height: 48)
+                            .background(Color.black.opacity(0.7))
                             .clipShape(Circle())
                     }
                     .padding()
                     
                     Spacer()
+                    
+                    // Report/Flag button (top-right)
+                    Button(action: { showReportSheet = true }) {
+                        Text("🚩")
+                            .font(.system(size: 24))
+                            .frame(width: 48, height: 48)
+                            .background(Color.black.opacity(0.7))
+                            .clipShape(Circle())
+                    }
+                    .padding()
                 }
                 
                 Spacer()
@@ -87,6 +99,17 @@ struct VideoPlayerView: View {
         .navigationBarHidden(true)
         .onAppear {
             setupPlayer()
+        }
+        .sheet(isPresented: $showReportSheet) {
+            ReportVideoSheet(
+                contentTitle: content.title,
+                onDismiss: { showReportSheet = false },
+                onReportSubmit: { reason, details in
+                    print("🚩 Report submitted for '\(content.title)': \(reason) - \(details)")
+                    // TODO: Send report to backend
+                    showReportSheet = false
+                }
+            )
         }
     }
     
@@ -164,6 +187,129 @@ extension AVPlayer {
         // Simplified observer - in production, use proper KVO
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             handler(self, nil)
+        }
+    }
+}
+
+struct ReportVideoSheet: View {
+    let contentTitle: String
+    let onDismiss: () -> Void
+    let onReportSubmit: (String, String) -> Void
+    
+    @State private var selectedReason: String = ""
+    @State private var additionalDetails: String = ""
+    
+    let reportReasons = [
+        "Inappropriate Content",
+        "Copyright Violation",
+        "Misleading or Spam",
+        "Violence or Harmful Content",
+        "Hate Speech",
+        "Other"
+    ]
+    
+    var body: some View {
+        NavigationView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Header
+                HStack(spacing: 8) {
+                    Text("🚩")
+                        .font(.system(size: 28))
+                    Text("Report Video")
+                        .font(.system(size: 24, weight: .bold))
+                }
+                .padding(.top, 8)
+                
+                Text("Report: \"\(contentTitle)\"")
+                    .font(.system(size: 14))
+                    .foregroundColor(.gray)
+                
+                Divider()
+                
+                // Question
+                Text("Why are you reporting this video?")
+                    .font(.system(size: 16, weight: .medium))
+                
+                // Report reasons
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(reportReasons, id: \.self) { reason in
+                            Button(action: {
+                                selectedReason = reason
+                            }) {
+                                HStack {
+                                    Image(systemName: selectedReason == reason ? "circle.fill" : "circle")
+                                        .foregroundColor(selectedReason == reason ? .blue : .gray)
+                                    Text(reason)
+                                        .foregroundColor(.primary)
+                                        .font(.system(size: 15))
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                }
+                
+                // Additional details
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Additional details (optional)")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                    
+                    TextEditor(text: $additionalDetails)
+                        .frame(height: 100)
+                        .padding(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                        .overlay(
+                            Group {
+                                if additionalDetails.isEmpty {
+                                    Text("Provide more information...")
+                                        .foregroundColor(.gray.opacity(0.5))
+                                        .padding(.leading, 12)
+                                        .padding(.top, 16)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                        )
+                }
+                
+                Spacer()
+                
+                // Action buttons
+                HStack(spacing: 12) {
+                    Button(action: onDismiss) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .foregroundColor(.blue)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(12)
+                    }
+                    
+                    Button(action: {
+                        if !selectedReason.isEmpty {
+                            onReportSubmit(selectedReason, additionalDetails)
+                        }
+                    }) {
+                        Text("Submit Report")
+                            .font(.system(size: 16, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .foregroundColor(.white)
+                            .background(selectedReason.isEmpty ? Color.gray : Color.red)
+                            .cornerRadius(12)
+                    }
+                    .disabled(selectedReason.isEmpty)
+                }
+            }
+            .padding()
+            .navigationBarHidden(true)
         }
     }
 }

@@ -73,21 +73,40 @@ struct SignUpView: View {
                     )
             }
             
-            ScrollView {
-                VStack(spacing: 20) {
-                    Spacer()
-                        .frame(height: 40)
-                    
-                    // App Title
-                    VStack(spacing: 8) {
-                        Text("Create Account")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.white)
-                        
-                        Text("Join mAIScreen today")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.8))
+            VStack(spacing: 0) {
+                // Back Button
+                HStack {
+                    Button(action: onBackToLoginClick) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 17, weight: .regular))
+                        }
+                        .foregroundColor(.white)
                     }
+                    .disabled(isLoading)
+                    .padding(.leading, 16)
+                    .padding(.top, 16)
+                    
+                    Spacer()
+                }
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        Spacer()
+                            .frame(height: 20)
+                        
+                        // App Title
+                        VStack(spacing: 8) {
+                            Text("Create Account")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            Text("Join mAIScreen today")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
                     
                     Spacer()
                         .frame(height: 20)
@@ -263,10 +282,11 @@ struct SignUpView: View {
                     }
                     .disabled(isLoading)
                     
-                    Spacer()
-                        .frame(height: 20)
+                        Spacer()
+                            .frame(height: 20)
+                    }
+                    .padding(.horizontal, 24)
                 }
-                .padding(.horizontal, 24)
             }
         }
     }

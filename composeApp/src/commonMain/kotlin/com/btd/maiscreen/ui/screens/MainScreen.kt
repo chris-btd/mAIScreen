@@ -64,10 +64,12 @@ fun MainScreen(
     onProfileClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onUploadClick: () -> Unit = {},
     onContentClick: (ContentItem) -> Unit = {},
     onPlayContent: (ContentItem) -> Unit = {},
     onToggleLike: (ContentItem) -> Unit = {},
     onToggleWatchlist: (ContentItem) -> Unit = {},
+    recentlyWatched: List<ContentItem> = emptyList(),
     viewModel: MainScreenViewModel = remember { MainScreenViewModel() }
 ) {
     // Collect UI state from ViewModel
@@ -75,6 +77,9 @@ fun MainScreen(
     val navyBlue = Color(0xFF1B2951)
     val black = Color(0xFF000000)
     val starWhite = Color(0xFFFFFFFF)
+    
+    // Drawer state
+    var showDrawer by remember { mutableStateOf(false) }
     
     // Handle loading state
     if (uiState.isLoading) {
@@ -142,12 +147,7 @@ fun MainScreen(
             TopNavigationBar(
                 onSearchClick = onSearchClick,
                 onProfileClick = onProfileClick,
-                onSettingsClick = onSettingsClick,
-                onLogoutClick = {
-                    // Import AuthManager and AppAuthState
-                    com.btd.maiscreen.auth.AuthManager.logout()
-                    com.btd.maiscreen.auth.AppAuthState.logout()
-                }
+                onMenuClick = { showDrawer = true }
             )
             
             // Featured Content Hero Section
@@ -156,6 +156,22 @@ fun MainScreen(
                     content = content,
                     onPlayClick = { onPlayContent(content) }
                 )
+            }
+            
+            // Recently Watched Section (only show if recently watched has items)
+            if (recentlyWatched.isNotEmpty()) {
+                RecentlyWatchedSection(
+                    recentlyWatched = recentlyWatched,
+                    onContentClick = onContentClick,
+                    onShowDetails = { content ->
+                        viewModel.showContentDetails(content)
+                        onContentClick(content)
+                    },
+                    onPlayContent = onPlayContent,
+                    onToggleLike = onToggleLike,
+                    onToggleWatchlist = onToggleWatchlist
+                )
+                Spacer(modifier = Modifier.height(24.dp))
             }
             
             // My List Section (only show if watchlist has items)
@@ -207,6 +223,21 @@ fun MainScreen(
                 onToggleWatchlist = { content -> viewModel.toggleWatchlist(content) }
             )
         }
+        
+        // Sliding Drawer
+        if (showDrawer) {
+            SlidingDrawer(
+                onDismiss = { showDrawer = false },
+                onSettingsClick = {
+                    showDrawer = false
+                    onSettingsClick()
+                },
+                onUploadClick = {
+                    showDrawer = false
+                    onUploadClick()
+                }
+            )
+        }
     }
 }
 
@@ -214,8 +245,7 @@ fun MainScreen(
 private fun TopNavigationBar(
     onSearchClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-    onLogoutClick: () -> Unit = {}
+    onMenuClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -224,13 +254,42 @@ private fun TopNavigationBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "mAIScreen",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
+        // Left side: Profile image + Title
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Circular profile image button
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF667EEA),
+                                Color(0xFF764BA2)
+                            )
+                        ),
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+                    .clickable(onClick = onMenuClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "👤",
+                    fontSize = 20.sp
+                )
+            }
+            
+            Text(
+                text = "mAIScreen",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
         
+        // Right side: Search and Profile icons
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -242,25 +301,9 @@ private fun TopNavigationBar(
                 )
             }
             
-            IconButton(onClick = onSettingsClick) {
-                Text(
-                    text = "⚙️",
-                    fontSize = 20.sp,
-                    color = Color.White
-                )
-            }
-            
             IconButton(onClick = onProfileClick) {
                 Text(
-                    text = "👤",
-                    fontSize = 20.sp,
-                    color = Color.White
-                )
-            }
-            
-            IconButton(onClick = onLogoutClick) {
-                Text(
-                    text = "🚪",
+                    text = "📊",
                     fontSize = 20.sp,
                     color = Color.White
                 )
@@ -376,6 +419,64 @@ private fun FeaturedContentHero(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentlyWatchedSection(
+    recentlyWatched: List<ContentItem>,
+    onContentClick: (ContentItem) -> Unit,
+    onShowDetails: (ContentItem) -> Unit,
+    onPlayContent: (ContentItem) -> Unit,
+    onToggleLike: (ContentItem) -> Unit,
+    onToggleWatchlist: (ContentItem) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "🕐",
+                    fontSize = 20.sp
+                )
+                Text(
+                    text = "Recently Watched",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+            
+            Text(
+                text = "${recentlyWatched.size} ${if (recentlyWatched.size == 1) "video" else "videos"}",
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+        }
+        
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(recentlyWatched) { item ->
+                EnhancedContentCard(
+                    content = item,
+                    onClick = { onContentClick(item) },
+                    onShowDetails = { onShowDetails(item) },
+                    onPlay = { onPlayContent(item) },
+                    onToggleLike = { onToggleLike(item) },
+                    onToggleWatchlist = { onToggleWatchlist(item) }
+                )
             }
         }
     }
@@ -1034,5 +1135,156 @@ private fun ErrorScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SlidingDrawer(
+    onDismiss: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onUploadClick: () -> Unit
+) {
+    // Dark overlay background
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(onClick = onDismiss)
+    )
+    
+    // Drawer content
+    Row(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Drawer panel
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(280.dp)
+                .background(Color(0xFF1B2951))
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) { /* Prevent clicks from passing through */ }
+        ) {
+            // Header with profile
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF667EEA),
+                                Color(0xFF764BA2)
+                            )
+                        )
+                    )
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Profile image
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(
+                            Color.White.copy(alpha = 0.2f),
+                            shape = androidx.compose.foundation.shape.CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "👤",
+                        fontSize = 40.sp
+                    )
+                }
+                
+                Text(
+                    text = "My Account",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Menu items
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                // Upload option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onUploadClick)
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "📤",
+                        fontSize = 24.sp
+                    )
+                    Text(
+                        text = "Upload",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                
+                Divider(
+                    color = Color.White.copy(alpha = 0.1f),
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                
+                // Settings option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onSettingsClick)
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "⚙️",
+                        fontSize = 24.sp
+                    )
+                    Text(
+                        text = "Settings",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                
+                Divider(
+                    color = Color.White.copy(alpha = 0.1f),
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+            }
+            
+            // Footer
+            Text(
+                text = "mAIScreen v1.0.0",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        }
+        
+        // Empty space (to allow clicking outside drawer to close)
+        Spacer(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        )
     }
 }

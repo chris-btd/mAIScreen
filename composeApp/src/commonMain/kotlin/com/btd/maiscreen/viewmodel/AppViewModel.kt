@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.btd.maiscreen.ui.screens.ContentItem
 
 /**
  * ViewModel for managing app-wide UI state and error messages
@@ -20,6 +21,10 @@ class AppViewModel : ViewModel() {
     
     // Success message state
     var successMessage by mutableStateOf<String?>(null)
+        private set
+    
+    // Recently watched content (max 10 items)
+    var recentlyWatchedContent by mutableStateOf<List<ContentItem>>(emptyList())
         private set
     
     // Show error message
@@ -57,6 +62,32 @@ class AppViewModel : ViewModel() {
         errorMessage = null
         successMessage = null
         isLoading = false
+    }
+    
+    // Add content to recently watched
+    fun addToRecentlyWatched(content: ContentItem) {
+        val currentList = recentlyWatchedContent.toMutableList()
+        
+        // Remove if already exists to avoid duplicates
+        currentList.removeAll { it.id == content.id }
+        
+        // Add to the beginning
+        currentList.add(0, content)
+        
+        // Keep only the last 10 items
+        if (currentList.size > 10) {
+            recentlyWatchedContent = currentList.take(10)
+        } else {
+            recentlyWatchedContent = currentList
+        }
+        
+        println("📺 Added to recently watched: ${content.title}")
+    }
+    
+    // Clear recently watched
+    fun clearRecentlyWatched() {
+        recentlyWatchedContent = emptyList()
+        println("🗑️ Recently watched cleared")
     }
 }
 
