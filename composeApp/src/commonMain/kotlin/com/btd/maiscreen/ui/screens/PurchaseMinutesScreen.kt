@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.btd.maiscreen.model.ProfileUiState
 import kotlin.random.Random
 
 data class MinutePackage(
@@ -33,12 +34,13 @@ data class MinutePackage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PurchaseMinutesScreen(
-    currentMinutes: Int = 0,
+    uiState: ProfileUiState,
     onPackageSelected: (MinutePackage) -> Unit = {},
     onPurchaseClick: (MinutePackage) -> Unit,
     onBackClick: () -> Unit
 ) {
     var selectedPackage by remember { mutableStateOf<MinutePackage?>(null) }
+
     
     // Define minute packages based on the provided pricing
     val packages = listOf(
@@ -182,7 +184,7 @@ fun PurchaseMinutesScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "$currentMinutes Minutes",
+                            text = "$uiState.currentMinutes Minutes",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = goldAccent

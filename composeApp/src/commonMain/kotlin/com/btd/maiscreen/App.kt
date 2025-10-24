@@ -293,7 +293,7 @@ fun App() {
                 }
                 AppScreen.PurchaseMinutes -> {
                     PurchaseMinutesScreen(
-                        currentMinutes = profileViewModel.currentMinutes + profileViewModel.purchasedMinutes,
+                        uiState = profileViewModel.state.value,
                         onPurchaseClick = { pkg ->
                             println("💰 Purchasing ${pkg.minutes} minutes for ${pkg.price}")
                             // TODO: Integrate with in-app purchase system (Google Play/App Store)

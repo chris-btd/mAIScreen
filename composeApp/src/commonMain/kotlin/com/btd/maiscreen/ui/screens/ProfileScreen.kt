@@ -24,13 +24,14 @@ fun ProfileScreen(
     onBackClick: () -> Unit,
     onPurchaseMinutesClick: () -> Unit
 ) {
+    val uiState = viewModel.state.collectAsState()
     // Observe ViewModel state
-    val currentPlan = viewModel.currentPlan
-    val currentMinutes = viewModel.currentMinutes
-    val purchasedMinutes = viewModel.purchasedMinutes
-    val availablePlans = viewModel.availablePlans
-    val isLoading = viewModel.isLoading
-    val showChangePlanDialog = viewModel.showChangePlanDialog
+    val currentPlan = uiState.value.currentPlan
+    val currentMinutes = uiState.value.currentMinutes
+    val purchasedMinutes = uiState.value.purchasedMinutes
+    val availablePlans = uiState.value.availablePlans
+    val isLoading = uiState.value.isLoading
+    val showChangePlanDialog = uiState.value.showChangePlanDialog
     
     Box(
         modifier = Modifier
