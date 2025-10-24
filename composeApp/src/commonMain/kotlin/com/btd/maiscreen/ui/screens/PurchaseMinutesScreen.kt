@@ -184,7 +184,7 @@ fun PurchaseMinutesScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "$uiState.currentMinutes Minutes",
+                            text = "${uiState.currentMinutes} Minutes",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = goldAccent
