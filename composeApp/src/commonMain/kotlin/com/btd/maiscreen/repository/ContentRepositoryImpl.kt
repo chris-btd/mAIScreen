@@ -2,6 +2,7 @@ package com.btd.maiscreen.repository
 
 import androidx.compose.ui.graphics.Color
 import com.btd.maiscreen.config.AppConfig
+import com.btd.maiscreen.config.AppSettings
 import com.btd.maiscreen.model.ApiResponseError
 import com.btd.maiscreen.model.ContentResult
 import com.btd.maiscreen.model.NetworkError
@@ -33,8 +34,32 @@ class ContentRepositoryImpl(
     
     override suspend fun getFeaturedContent(): ContentResult<ContentItem> {
         return try {
-            // Simulate network delay
-            delay(500)
+            // Check if we should use test data or fetch from AWS
+            if (AppSettings.useTestData) {
+                // Return test data
+                return getTestFeaturedContent()
+            } else {
+                // TODO: Fetch from AWS API
+                // For now, fallback to test data if AWS call fails
+                return try {
+                    delay(500) // Simulate AWS API call
+                    // TODO: Replace with actual AWS API call
+                    // val response = awsApiClient.getFeaturedContent()
+                    // mapResponseToContentItem(response)
+                    getTestFeaturedContent() // Fallback for now
+                } catch (e: Exception) {
+                    println("⚠️ AWS API call failed, using test data: ${e.message}")
+                    getTestFeaturedContent() // Fallback to test data on error
+                }
+            }
+        } catch (e: Exception) {
+            NetworkError(e)
+        }
+    }
+    
+    private suspend fun getTestFeaturedContent(): ContentResult<ContentItem> {
+        return try {
+            delay(300) // Simulate network delay
             
             val featuredContent = ContentItem(
                 id = "featured1",
@@ -64,8 +89,32 @@ class ContentRepositoryImpl(
     
     override suspend fun getContentCategories(): ContentResult<List<ContentCategory>> {
         return try {
-            // Simulate network delay
-            delay(300)
+            // Check if we should use test data or fetch from AWS
+            if (AppSettings.useTestData) {
+                // Return test data
+                return getTestContentCategories()
+            } else {
+                // TODO: Fetch from AWS API
+                // For now, fallback to test data if AWS call fails
+                return try {
+                    delay(500) // Simulate AWS API call
+                    // TODO: Replace with actual AWS API call
+                    // val response = awsApiClient.getContentCategories()
+                    // mapResponseToCategories(response)
+                    getTestContentCategories() // Fallback for now
+                } catch (e: Exception) {
+                    println("⚠️ AWS API call failed, using test data: ${e.message}")
+                    getTestContentCategories() // Fallback to test data on error
+                }
+            }
+        } catch (e: Exception) {
+            NetworkError(e)
+        }
+    }
+    
+    private suspend fun getTestContentCategories(): ContentResult<List<ContentCategory>> {
+        return try {
+            delay(300) // Simulate network delay
             
             val categories = listOf(
                 ContentCategory(
