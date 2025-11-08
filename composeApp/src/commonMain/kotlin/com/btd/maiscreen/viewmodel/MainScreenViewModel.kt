@@ -1,5 +1,6 @@
 package com.btd.maiscreen.viewmodel
 
+import androidx.lifecycle.viewModelScope
 import com.btd.maiscreen.common.BaseViewModel
 import com.btd.maiscreen.di.ContentModule
 import com.btd.maiscreen.model.ApiResponseError
@@ -8,10 +9,8 @@ import com.btd.maiscreen.model.Success
 import com.btd.maiscreen.repository.ContentRepository
 import com.btd.maiscreen.ui.screens.ContentItem
 import com.btd.maiscreen.ui.state.MainScreenUiState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -21,12 +20,40 @@ import kotlinx.coroutines.launch
 class MainScreenViewModel(
     private val repository: ContentRepository = ContentModule.provideContentRepository()
 ) : BaseViewModel<MainScreenUiState>(MainScreenUiState()) {
-    
-    // Create a CoroutineScope for this ViewModel
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    
+
+    // Debouncing timestamps for user actions
+    private var lastLikeActionTime = 0L
+    private var lastWatchlistActionTime = 0L
+    private val debounceDelay = 500L // milliseconds
+
     init {
         loadContent()
+    }
+
+    /**
+     * Sanitize error messages to prevent XSS and limit sensitive information exposure
+     */
+    private fun sanitizeErrorMessage(message: String): String {
+        // Remove any potential HTML/script tags and limit length
+        val sanitized = message
+            .replace(Regex("<[^>]*>"), "")
+            .replace(Regex("javascript:"), "")
+            .take(200) // Limit message length
+
+        // If message contains stack traces or paths, use generic message
+        return if (sanitized.contains(Regex("at \\w+\\.\\w+")) || sanitized.contains("/")) {
+            "An error occurred. Please try again later."
+        } else {
+            sanitized.ifEmpty { "An error occurred. Please try again later." }
+        }
+    }
+
+    /**
+     * Validate content ID to prevent injection attacks
+     */
+    private fun isValidContentId(id: String): Boolean {
+        // Content IDs should be alphanumeric with hyphens and underscores only
+        return id.matches(Regex("^[a-zA-Z0-9_-]+$")) && id.length <= 100
     }
     
     /**
@@ -50,60 +77,60 @@ class MainScreenViewModel(
                         setState { copy(featuredContent = featuredResult.data) }
                     }
                     is ApiResponseError -> {
-                        setState { 
+                        setState {
                             copy(
-                                hasError = true, 
-                                errorMessage = "Failed to load featured content: ${featuredResult.message}"
-                            ) 
+                                hasError = true,
+                                errorMessage = sanitizeErrorMessage("Failed to load featured content: ${featuredResult.message}")
+                            )
                         }
                     }
                     is NetworkError -> {
-                        setState { 
+                        setState {
                             copy(
-                                hasError = true, 
-                                errorMessage = "Network error: ${featuredResult.exception.message}"
-                            ) 
+                                hasError = true,
+                                errorMessage = "Network error. Please check your connection and try again."
+                            )
                         }
                     }
                 }
-                
+
                 // Handle categories result
                 when (categoriesResult) {
                     is Success -> {
-                        setState { 
+                        setState {
                             copy(
                                 contentCategories = categoriesResult.data,
                                 isLoading = false
-                            ) 
+                            )
                         }
                     }
                     is ApiResponseError -> {
-                        setState { 
+                        setState {
                             copy(
-                                hasError = true, 
-                                errorMessage = "Failed to load categories: ${categoriesResult.message}",
+                                hasError = true,
+                                errorMessage = sanitizeErrorMessage("Failed to load categories: ${categoriesResult.message}"),
                                 isLoading = false
-                            ) 
+                            )
                         }
                     }
                     is NetworkError -> {
-                        setState { 
+                        setState {
                             copy(
-                                hasError = true, 
-                                errorMessage = "Network error: ${categoriesResult.exception.message}",
+                                hasError = true,
+                                errorMessage = "Network error. Please check your connection and try again.",
                                 isLoading = false
-                            ) 
+                            )
                         }
                     }
                 }
-                
+
             } catch (e: Exception) {
-                setState { 
+                setState {
                     copy(
-                        hasError = true, 
-                        errorMessage = "Unexpected error: ${e.message}",
+                        hasError = true,
+                        errorMessage = "An error occurred. Please try again later.",
                         isLoading = false
-                    ) 
+                    )
                 }
             }
         }
@@ -134,9 +161,27 @@ class MainScreenViewModel(
     }
     
     /**
-     * Toggle like status for content
+     * Toggle like status for content with debouncing and validation
      */
     fun toggleLike(content: ContentItem) {
+        // Debounce: Prevent rapid-fire requests
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastLikeActionTime < debounceDelay) {
+            return
+        }
+        lastLikeActionTime = currentTime
+
+        // Validate content ID
+        if (!isValidContentId(content.id)) {
+            setState {
+                copy(
+                    hasError = true,
+                    errorMessage = "Invalid content ID"
+                )
+            }
+            return
+        }
+
         viewModelScope.launch {
             try {
                 when (val result = repository.toggleLike(content.id)) {
@@ -145,37 +190,55 @@ class MainScreenViewModel(
                         updateContentInState(result.data)
                     }
                     is ApiResponseError -> {
-                        setState { 
+                        setState {
                             copy(
                                 hasError = true,
-                                errorMessage = "Failed to update like: ${result.message}"
-                            ) 
+                                errorMessage = sanitizeErrorMessage("Failed to update like: ${result.message}")
+                            )
                         }
                     }
                     is NetworkError -> {
-                        setState { 
+                        setState {
                             copy(
                                 hasError = true,
-                                errorMessage = "Network error: ${result.exception.message}"
-                            ) 
+                                errorMessage = "Network error. Please check your connection and try again."
+                            )
                         }
                     }
                 }
             } catch (e: Exception) {
-                setState { 
+                setState {
                     copy(
                         hasError = true,
-                        errorMessage = "Error updating like: ${e.message}"
-                    ) 
+                        errorMessage = "An error occurred. Please try again later."
+                    )
                 }
             }
         }
     }
     
     /**
-     * Toggle watchlist status for content
+     * Toggle watchlist status for content with debouncing and validation
      */
     fun toggleWatchlist(content: ContentItem) {
+        // Debounce: Prevent rapid-fire requests
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastWatchlistActionTime < debounceDelay) {
+            return
+        }
+        lastWatchlistActionTime = currentTime
+
+        // Validate content ID
+        if (!isValidContentId(content.id)) {
+            setState {
+                copy(
+                    hasError = true,
+                    errorMessage = "Invalid content ID"
+                )
+            }
+            return
+        }
+
         viewModelScope.launch {
             try {
                 when (val result = repository.toggleWatchlist(content.id)) {
@@ -183,7 +246,7 @@ class MainScreenViewModel(
                         // Update the content in our state
                         val updatedContent = result.data
                         updateContentInState(updatedContent)
-                        
+
                         // Update watchlist based on the new status
                         val currentState = state.value
                         val newWatchList = if (updatedContent.isInWatchlist) {
@@ -200,28 +263,28 @@ class MainScreenViewModel(
                         setState { copy(watchList = newWatchList) }
                     }
                     is ApiResponseError -> {
-                        setState { 
+                        setState {
                             copy(
                                 hasError = true,
-                                errorMessage = "Failed to update watchlist: ${result.message}"
-                            ) 
+                                errorMessage = sanitizeErrorMessage("Failed to update watchlist: ${result.message}")
+                            )
                         }
                     }
                     is NetworkError -> {
-                        setState { 
+                        setState {
                             copy(
                                 hasError = true,
-                                errorMessage = "Network error: ${result.exception.message}"
-                            ) 
+                                errorMessage = "Network error. Please check your connection and try again."
+                            )
                         }
                     }
                 }
             } catch (e: Exception) {
-                setState { 
+                setState {
                     copy(
                         hasError = true,
-                        errorMessage = "Error updating watchlist: ${e.message}"
-                    ) 
+                        errorMessage = "An error occurred. Please try again later."
+                    )
                 }
             }
         }

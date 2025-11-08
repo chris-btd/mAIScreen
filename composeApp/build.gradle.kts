@@ -69,20 +69,33 @@ android {
         versionName = "1.0"
         
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
-        // Build configuration for sensitive values
-        buildConfigField("String", "CLOUDFRONT_DOMAIN", "\"d2ofvyi6ramrc2.cloudfront.net\"")
-        buildConfigField("String", "TEST_EMAIL", "\"test@test.com\"")
-        buildConfigField("String", "TEST_PASSWORD", "\"1111111\"")
-        
-        // Demo video URLs for testing
+
+        // Build configuration for sensitive values - loaded from environment variables
+        // Set these in your local.properties file (not committed to git) or CI/CD environment:
+        // CLOUDFRONT_DOMAIN=your-cloudfront-domain.cloudfront.net
+        // TEST_EMAIL=your-test-email@example.com
+        // TEST_PASSWORD=your-test-password
+        // COGNITO_ISSUER_URI=https://cognito-idp.region.amazonaws.com/your-user-pool-id
+        // COGNITO_CLIENT_ID=your-cognito-client-id
+
+        val cloudfrontDomain = System.getenv("CLOUDFRONT_DOMAIN") ?: findProperty("CLOUDFRONT_DOMAIN") as? String ?: ""
+        val testEmail = System.getenv("TEST_EMAIL") ?: findProperty("TEST_EMAIL") as? String ?: ""
+        val testPassword = System.getenv("TEST_PASSWORD") ?: findProperty("TEST_PASSWORD") as? String ?: ""
+        val cognitoIssuerUri = System.getenv("COGNITO_ISSUER_URI") ?: findProperty("COGNITO_ISSUER_URI") as? String ?: ""
+        val cognitoClientId = System.getenv("COGNITO_CLIENT_ID") ?: findProperty("COGNITO_CLIENT_ID") as? String ?: ""
+
+        buildConfigField("String", "CLOUDFRONT_DOMAIN", "\"$cloudfrontDomain\"")
+        buildConfigField("String", "TEST_EMAIL", "\"$testEmail\"")
+        buildConfigField("String", "TEST_PASSWORD", "\"$testPassword\"")
+
+        // Demo video URLs for testing (non-sensitive)
         buildConfigField("String", "DEMO_VIDEO_1", "\"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4\"")
         buildConfigField("String", "DEMO_VIDEO_2", "\"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4\"")
         buildConfigField("String", "DEMO_VIDEO_3", "\"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4\"")
-        
+
         // AWS Cognito Configuration
-        buildConfigField("String", "COGNITO_ISSUER_URI", "\"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_rty4feGNd\"")
-        buildConfigField("String", "COGNITO_CLIENT_ID", "\"11jljm542ir3b5ejqqeu9nn20q\"")
+        buildConfigField("String", "COGNITO_ISSUER_URI", "\"$cognitoIssuerUri\"")
+        buildConfigField("String", "COGNITO_CLIENT_ID", "\"$cognitoClientId\"")
         buildConfigField("String", "COGNITO_REDIRECT_URI", "\"maiscreen.auth://callback\"")
         buildConfigField("String", "COGNITO_LOGOUT_URI", "\"maiscreen.auth://logout\"")
         buildConfigField("String", "COGNITO_SCOPE", "\"email openid phone\"")

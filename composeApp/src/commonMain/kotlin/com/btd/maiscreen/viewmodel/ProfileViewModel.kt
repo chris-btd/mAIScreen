@@ -30,6 +30,17 @@ class ProfileViewModel : BaseViewModel<ProfileUiState>(ProfileUiState()) {
     }
     
     fun changePlan(plan: SubscriptionPlan) {
+        // Validate plan input
+        if (plan.name.isBlank() || plan.minutes < 0) {
+            setState {
+                copy(
+                    errorMessage = "Invalid plan selected",
+                    isLoading = false
+                )
+            }
+            return
+        }
+
         setState { copy(isLoading = true, errorMessage = null)}
         // TODO: Call backend API to change plan
         // For now, simulate the change
@@ -43,8 +54,16 @@ class ProfileViewModel : BaseViewModel<ProfileUiState>(ProfileUiState()) {
         }
         hideChangePlanDialog()
     }
-    
+
     fun purchaseMinutes(minutes: Int) {
+        // Validate minutes input
+        if (minutes <= 0 || minutes > 10000) {
+            setState {
+                copy(errorMessage = "Invalid minutes amount")
+            }
+            return
+        }
+
         // TODO: Call backend API to purchase minutes
         // For now, simulate the purchase
         setState {

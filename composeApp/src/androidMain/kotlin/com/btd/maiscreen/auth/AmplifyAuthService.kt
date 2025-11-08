@@ -1,9 +1,9 @@
 package com.btd.maiscreen.auth
 
-import android.util.Log
 import com.amplifyframework.auth.AuthUserAttribute
 import com.amplifyframework.auth.AuthUserAttributeKey
 import com.amplifyframework.core.Amplify
+import com.btd.maiscreen.util.SecureLogger
 
 /**
  * AWS Amplify Authentication Service
@@ -29,32 +29,30 @@ class AmplifyAuthService {
      * Sign up a new user with email and password
      */
     fun signUp(firstName: String, lastName: String, email: String, password: String, birthdate: String) {
-        Log.d(TAG, "🚀 Starting sign up for: $email")
-        
+        SecureLogger.d(TAG, "Starting sign up")
+
         val attributes = listOf(
             AuthUserAttribute(AuthUserAttributeKey.email(), email),
             AuthUserAttribute(AuthUserAttributeKey.givenName(), firstName),
             AuthUserAttribute(AuthUserAttributeKey.familyName(), lastName),
             AuthUserAttribute(AuthUserAttributeKey.birthdate(), birthdate)
         )
-        
+
         val options = com.amplifyframework.auth.options.AuthSignUpOptions.builder()
             .userAttributes(attributes)
             .build()
-            
+
         Amplify.Auth.signUp(
             email, // Use email as username
             password,
             options,
             { result ->
-                Log.d(TAG, "✅ Sign up succeeded for: $email")
-                Log.d(TAG, "Sign up complete: ${result.isSignUpComplete}")
-                Log.d(TAG, "Next step: ${result.nextStep}")
-                
+                SecureLogger.d(TAG, "Sign up succeeded")
+
                 onSignUpSuccess?.invoke(email, result.isSignUpComplete)
             },
             { error ->
-                Log.e(TAG, "❌ Sign up failed for: $email", error)
+                SecureLogger.e(TAG, "Sign up failed", error)
                 onSignUpError?.invoke(error.message ?: "Sign up failed")
             }
         )
@@ -64,19 +62,18 @@ class AmplifyAuthService {
      * Confirm sign up with verification code
      */
     fun confirmSignUp(username: String, confirmationCode: String) {
-        Log.d(TAG, "🔐 Confirming sign up for: $username with code: $confirmationCode")
-        
+        SecureLogger.d(TAG, "Confirming sign up")
+
         Amplify.Auth.confirmSignUp(
             username,
             confirmationCode,
             { result ->
-                Log.d(TAG, "✅ Confirm sign up succeeded for: $username")
-                Log.d(TAG, "Sign up complete: ${result.isSignUpComplete}")
-                
+                SecureLogger.d(TAG, "Confirm sign up succeeded")
+
                 onConfirmationSuccess?.invoke()
             },
             { error ->
-                Log.e(TAG, "❌ Confirm sign up failed for: $username", error)
+                SecureLogger.e(TAG, "Confirm sign up failed", error)
                 onConfirmationError?.invoke(error.message ?: "Confirmation failed")
             }
         )
@@ -86,15 +83,15 @@ class AmplifyAuthService {
      * Resend confirmation code
      */
     fun resendConfirmationCode(username: String) {
-        Log.d(TAG, "📧 Resending confirmation code for: $username")
+        SecureLogger.d(TAG,"📧 Resending confirmation code for: $username")
         
         Amplify.Auth.resendSignUpCode(
             username,
             { result ->
-                Log.d(TAG, "✅ Confirmation code resent to: ${result.destination}")
+                SecureLogger.d(TAG,"✅ Confirmation code resent to: ${result.destination}")
             },
             { error ->
-                Log.e(TAG, "❌ Failed to resend confirmation code", error)
+                SecureLogger.e(TAG,"❌ Failed to resend confirmation code", error)
                 onSignUpError?.invoke("Failed to resend code: ${error.message}")
             }
         )
@@ -104,25 +101,25 @@ class AmplifyAuthService {
      * Sign in with email and password
      */
     fun signIn(email: String, password: String) {
-        Log.d(TAG, "🔑 Signing in: $email")
+        SecureLogger.d(TAG,"🔑 Signing in: $email")
         
         Amplify.Auth.signIn(
             email,
             password,
             { result ->
-                Log.d(TAG, "✅ Sign in succeeded for: $email")
-                Log.d(TAG, "Sign in complete: ${result.isSignedIn}")
+                SecureLogger.d(TAG,"✅ Sign in succeeded for: $email")
+                SecureLogger.d(TAG,"Sign in complete: ${result.isSignedIn}")
                 
                 if (result.isSignedIn) {
                     onSignInSuccess?.invoke()
                 } else {
-                    Log.d(TAG, "Additional steps required: ${result.nextStep}")
+                    SecureLogger.d(TAG,"Additional steps required: ${result.nextStep}")
                     // Handle MFA or other additional steps if needed
                     onSignInError?.invoke("Additional authentication steps required")
                 }
             },
             { error ->
-                Log.e(TAG, "❌ Sign in failed for: $email", error)
+                SecureLogger.e(TAG,"❌ Sign in failed for: $email", error)
                 onSignInError?.invoke(error.message ?: "Sign in failed")
             }
         )
@@ -132,11 +129,11 @@ class AmplifyAuthService {
      * Sign out current user
      */
     fun signOut() {
-        Log.d(TAG, "🚪 Signing out")
+        SecureLogger.d(TAG,"🚪 Signing out")
         
         Amplify.Auth.signOut(
             {
-                Log.d(TAG, "✅ Sign out succeeded")
+                SecureLogger.d(TAG,"✅ Sign out succeeded")
             }
         )
     }
@@ -145,17 +142,17 @@ class AmplifyAuthService {
      * Sign out from all devices (global sign out)
      */
     fun globalSignOut() {
-        Log.d(TAG, "🚪 Global sign out - signing out from all devices")
+        SecureLogger.d(TAG,"🚪 Global sign out - signing out from all devices")
         
 //        Amplify.Auth.signOut(
 //            com.amplifyframework.auth.options.AuthSignOutOptions.builder()
 //                .globalSignOut(true)
 //                .build(),
 //            {
-//                Log.d(TAG, "✅ Global sign out succeeded")
+//                SecureLogger.d(TAG,"✅ Global sign out succeeded")
 //            },
 //            { error ->
-//                Log.e(TAG, "❌ Global sign out failed", error)
+//                SecureLogger.e(TAG,"❌ Global sign out failed", error)
 //            }
 //        )
     }
@@ -167,11 +164,11 @@ class AmplifyAuthService {
         Amplify.Auth.fetchAuthSession(
             { result ->
                 val isSignedIn = result.isSignedIn
-                Log.d(TAG, "Auth session check - Signed in: $isSignedIn")
+                SecureLogger.d(TAG,"Auth session check - Signed in: $isSignedIn")
                 callback(isSignedIn)
             },
             { error ->
-                Log.e(TAG, "Failed to fetch auth session", error)
+                SecureLogger.e(TAG,"Failed to fetch auth session", error)
                 callback(false)
             }
         )
@@ -183,10 +180,10 @@ class AmplifyAuthService {
     fun getCurrentUser() {
         Amplify.Auth.getCurrentUser(
             { user ->
-                Log.d(TAG, "Current user: ${user.username}")
+                SecureLogger.d(TAG,"Current user: ${user.username}")
             },
             { error ->
-                Log.e(TAG, "Failed to get current user", error)
+                SecureLogger.e(TAG,"Failed to get current user", error)
             }
         )
     }
@@ -196,30 +193,30 @@ class AmplifyAuthService {
      * This method is used during app startup to determine navigation flow
      */
     fun checkAuthenticationStatus() {
-        Log.d(TAG, "🔍 Checking authentication status...")
+        SecureLogger.d(TAG,"🔍 Checking authentication status...")
         
         Amplify.Auth.fetchAuthSession(
             { result ->
                 if (result.isSignedIn) {
-                    Log.d(TAG, "✅ User is authenticated")
+                    SecureLogger.d(TAG,"✅ User is authenticated")
                     // Get current user details to retrieve email
                     Amplify.Auth.getCurrentUser(
                         { user ->
-                            Log.d(TAG, "Current authenticated user: ${user.username}")
+                            SecureLogger.d(TAG,"Current authenticated user: ${user.username}")
                             onAuthCheckSuccess?.invoke(user.username)
                         },
                         { error ->
-                            Log.e(TAG, "Failed to get current user details", error)
+                            SecureLogger.e(TAG,"Failed to get current user details", error)
                             onAuthCheckSuccess?.invoke(null)
                         }
                     )
                 } else {
-                    Log.d(TAG, "❌ User is not authenticated")
+                    SecureLogger.d(TAG,"❌ User is not authenticated")
                     onAuthCheckError?.invoke()
                 }
             },
             { error ->
-                Log.e(TAG, "Failed to fetch auth session", error)
+                SecureLogger.e(TAG,"Failed to fetch auth session", error)
                 onAuthCheckError?.invoke()
             }
         )

@@ -29,32 +29,45 @@ class AppViewModel : ViewModel() {
     
     // Show error message
     fun showError(message: String) {
-        errorMessage = message
-        println("❌ Error shown: $message")
+        // Sanitize error message to prevent XSS
+        errorMessage = sanitizeErrorMessage(message)
     }
-    
+
     // Clear error message
     fun clearError() {
         errorMessage = null
-        println("✅ Error cleared")
     }
-    
+
     // Show success message
     fun showSuccess(message: String) {
         successMessage = message
-        println("✅ Success shown: $message")
     }
-    
+
     // Clear success message
     fun clearSuccess() {
         successMessage = null
-        println("✅ Success cleared")
     }
-    
+
     // Set loading state
     fun setAppLoading(loading: Boolean) {
         isLoading = loading
-        println("⏳ Loading state: $loading")
+    }
+
+    /**
+     * Sanitize error messages to prevent XSS and limit sensitive information exposure
+     */
+    private fun sanitizeErrorMessage(message: String): String {
+        // Remove any potential HTML/script tags
+        val sanitized = message
+            .replace(Regex("<[^>]*>"), "")
+            .replace(Regex("javascript:", ""), "")
+
+        // If message is too detailed (contains stack traces or paths), use generic message
+        return if (sanitized.contains(Regex("at \\w+\\.\\w+")) || sanitized.contains("/") || sanitized.length > 200) {
+            "An error occurred. Please try again later."
+        } else {
+            sanitized
+        }
     }
     
     // Clear all messages
@@ -67,27 +80,24 @@ class AppViewModel : ViewModel() {
     // Add content to recently watched
     fun addToRecentlyWatched(content: ContentItem) {
         val currentList = recentlyWatchedContent.toMutableList()
-        
+
         // Remove if already exists to avoid duplicates
         currentList.removeAll { it.id == content.id }
-        
+
         // Add to the beginning
         currentList.add(0, content)
-        
+
         // Keep only the last 10 items
         if (currentList.size > 10) {
             recentlyWatchedContent = currentList.take(10)
         } else {
             recentlyWatchedContent = currentList
         }
-        
-        println("📺 Added to recently watched: ${content.title}")
     }
-    
+
     // Clear recently watched
     fun clearRecentlyWatched() {
         recentlyWatchedContent = emptyList()
-        println("🗑️ Recently watched cleared")
     }
 }
 
