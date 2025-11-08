@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.btd.maiscreen.config.AppSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +25,8 @@ fun SettingsScreen(
     onPurchaseMinutesClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {}
 ) {
+    // Observe test data setting - initialize from AppSettings
+    var useTestData by remember { mutableStateOf(AppSettings.useTestData) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -160,6 +163,119 @@ fun SettingsScreen(
                                     "• Plays demo videos instantly\n• No internet required\n• Perfect for testing UI\n• Uses Big Buck Bunny, Elephants Dream, etc."
                                 } else {
                                     "• Streams from AWS CloudFront\n• Requires authentication\n• Tests your backend integration\n• Uses signed cookies for security"
+                                },
+                                fontSize = 12.sp,
+                                color = Color(0xFF374151),
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Content Data Source Section (Dev builds)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Content Data Source",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E3A8A)
+                    )
+                    
+                    Text(
+                        text = "Toggle between test data and AWS API (Dev builds)",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Data Source Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Use Test Data",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.Black
+                            )
+                            Text(
+                                text = if (useTestData) {
+                                    "🧪 Using hardcoded test content"
+                                } else {
+                                    "☁️ Fetching from AWS API"
+                                },
+                                fontSize = 12.sp,
+                                color = if (useTestData) Color(0xFF059669) else Color(0xFF1E3A8A)
+                            )
+                        }
+                        
+                        Switch(
+                            checked = useTestData,
+                            onCheckedChange = { newValue ->
+                                AppSettings.toggleTestData()
+                                useTestData = newValue // Update local state for immediate UI refresh
+                                // Note: MainScreen will need to reload after this change
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF059669), // Green when ON (test data)
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = Color(0xFF1E3A8A) // Blue when OFF (AWS)
+                            )
+                        )
+                    }
+                    
+                    // Info box
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (useTestData) 
+                                Color(0xFFECFDF5) else Color(0xFFEFF6FF) // Green tint for test, blue tint for AWS
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (useTestData) "🧪" else "☁️",
+                                    fontSize = 16.sp,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Text(
+                                    text = if (useTestData) "Test Data Mode" else "AWS API Mode",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (useTestData) Color(0xFF065F46) else Color(0xFF1E3A8A)
+                                )
+                            }
+                            Text(
+                                text = if (useTestData) {
+                                    "• Uses hardcoded test content\n• No network calls required\n• Perfect for UI testing\n• Fast and predictable data"
+                                } else {
+                                    "• Fetches content from AWS API\n• Requires backend integration\n• Tests real API endpoints\n• Updates with real data changes"
                                 },
                                 fontSize = 12.sp,
                                 color = Color(0xFF374151),

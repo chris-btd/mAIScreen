@@ -85,6 +85,465 @@ This is your end‑to‑end checklist to stand up the **streaming backend + prov
 
 ---
 
+## Backend Architecture Overview
+
+### Complete System Architecture
+
+The mAIScreen backend uses a **hybrid architecture** combining **AppSync (GraphQL)** for data operations and **API Gateway (REST)** for edge tasks that require HTTP-specific features.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Mobile/Web Client                            │
+│                  (iOS, Android, Web Applications)                     │
+└────────────────────┬──────────────────┬─────────────────────────────┘
+                     │                  │
+                     │ HTTPS            │ HTTPS
+                     ▼                  ▼
+         ┌─────────────────────┐   ┌─────────────────────┐
+         │   CloudFront (CDN)   │   │  CloudFront (CDN)    │
+         │   cdn.example.com    │   │   cdn.example.com    │
+         └───────────┬───────────┘   └───────────┬───────────┘
+                     │                          │
+        ┌────────────┴────────────┐  ┌──────────┴─────────────┐
+        │                         │  │                        │
+        ▼                         ▼  ▼                        ▼
+┌───────────────┐         ┌───────────────┐          ┌───────────────┐
+│  Origin A     │         │  Origin B     │          │  Origin C     │
+│  S3 Bucket    │         │  API Gateway │          │  AppSync      │
+│  /assets/*   │         │  /api/*      │          │  (GraphQL)     │
+│  (Private)    │         │  (REST)      │          │  /graphql     │
+└───────┬───────┘         └───────┬──────┘          └───────┬───────┘
+        │                          │                        │
+        │                          │                        │
+        │                          ▼                        ▼
+        │                  ┌───────────────┐        ┌───────────────┐
+        │                  │   Lambda      │        │  DynamoDB     │
+        │                  │   Functions   │        │  Tables       │
+        │                  │               │        │               │
+        │                  │ • Play        │        │ • Users       │
+        │                  │ • UploadUrl   │        │ • Content    │
+        │                  │ • Submit      │        │ • Submissions│
+        │                  └───────┬───────┘        │ • Reviews     │
+        │                          │                └───────────────┘
+        │                          │
+        │                          ▼
+        │                  ┌───────────────┐
+        │                  │ Secrets Mgr   │
+        │                  │ • CF Keys     │
+        │                  │ • API Keys    │
+        └──────────────────┴───────────────┘
+```
+
+### Request Flow Architecture
+
+#### 1. **Authentication & Authorization Layer**
+```
+Client App
+  │
+  │ 1. Login Request
+  ▼
+AWS Cognito (via Amplify)
+  │
+  │ 2. JWT Token (idToken, accessToken)
+  ▼
+Client App (stores tokens)
+  │
+  │ 3. Subsequent requests include: Authorization: Bearer <idToken>
+  ▼
+API Gateway / AppSync (validates JWT)
+```
+
+#### 2. **Data Operations Flow (AppSync GraphQL)**
+```
+Mobile/Web App
+  │
+  │ GraphQL Query/Mutation
+  │ Authorization: Bearer <idToken>
+  ▼
+CloudFront (/graphql endpoint)
+  │
+  │ Routes to AppSync
+  ▼
+AWS AppSync
+  │
+  │ Executes Resolvers
+  ├─► Direct DynamoDB Resolver ──► DynamoDB Tables
+  └─► Lambda Resolver ──────────► Lambda Function ──► DynamoDB/Other Services
+  │
+  │ Returns GraphQL Response
+  ▼
+Client App
+```
+
+**Use Cases for AppSync:**
+- User profile queries
+- Content listing and search
+- Submission CRUD operations
+- Reviews and ratings
+- Watchlist management
+- Subscription management
+- All data that fits the GraphQL query/mutation pattern
+
+#### 3. **Edge Operations Flow (API Gateway REST)**
+```
+Mobile/Web App
+  │
+  │ HTTP REST Request
+  │ GET /api/play/{assetId}?tier=free&mode=video
+  │ Authorization: Bearer <idToken>
+  ▼
+CloudFront (/api/* pattern)
+  │
+  │ Routes to API Gateway
+  ▼
+API Gateway (HTTP API v2)
+  │
+  │ 1. JWT Authorizer validates token
+  │    ├─ Issuer: Cognito User Pool
+  │    └─ Audience: App Client ID
+  │
+  │ 2. If authorized, routes to Lambda
+  ▼
+Lambda Function (Play)
+  │
+  │ 1. Reads user's subscription tier from AppSync/DynamoDB
+  │ 2. Retrieves CloudFront private key from Secrets Manager
+  │ 3. Signs CloudFront cookies for /assets/{assetId}/*
+  │ 4. Generates tier-appropriate manifest URL
+  │
+  │ Returns JSON:
+  │ {
+  │   "ok": true,
+  │   "manifestUrl": "https://cdn.example.com/assets/ASSET001/hls/master_free.m3u8",
+  │   "assetId": "ASSET001",
+  │   "tier": "free"
+  │ }
+  │
+  │ Sets HTTP Headers:
+  │ Set-Cookie: CloudFront-Policy=...
+  │ Set-Cookie: CloudFront-Signature=...
+  │ Set-Cookie: CloudFront-Key-Pair-Id=...
+  ▼
+API Gateway
+  │
+  │ Converts Lambda response to HTTP response
+  │ Preserves Set-Cookie headers
+  ▼
+CloudFront
+  │
+  │ Returns response with cookies to client
+  ▼
+Client App
+  │
+  │ Uses manifestUrl to request HLS segments
+  │ Includes cookies in requests to /assets/*
+  ▼
+CloudFront
+  │
+  │ Validates signed cookies
+  │ If valid, serves from S3 (via OAC)
+  ▼
+Client App (plays video)
+```
+
+### API Gateway Route Integrations
+
+#### Route Configuration Pattern
+
+Each API Gateway route connects to a Lambda function via **Lambda Proxy Integration**:
+
+```
+API Gateway Route
+  │
+  ├─ Route Definition
+  │   GET /api/play/{assetId}
+  │   Query Parameters: tier, mode
+  │
+  ├─ Authorization
+  │   Type: JWT Authorizer
+  │   Issuer: https://cognito-idp.{region}.amazonaws.com/{userPoolId}
+  │   Audience: {appClientId}
+  │   Authorization: Required
+  │
+  ├─ Integration
+  │   Type: Lambda Proxy Integration
+  │   Lambda Function: PlayFunction
+  │   Invoke with full request context
+  │
+  └─ Response
+      Status Code: 200
+      Headers: Set-Cookie (multiple)
+      Body: JSON
+```
+
+#### Complete Route List
+
+| Route | Method | Lambda Function | Purpose |
+|-------|--------|----------------|---------|
+| `/api/play/{assetId}` | GET | `PlayFunction` | Generate CloudFront signed cookies and return manifest URL |
+| `/api/upload-url` | GET | `UploadUrlFunction` | Generate S3 pre-signed PUT URL for direct upload |
+| `/api/submit` | POST | `SubmitFunction` | Process submission, validate tier, trigger MediaConvert |
+
+### Why Two APIs? (AppSync vs API Gateway)
+
+#### **AppSync (GraphQL)** - Use For:
+✅ **All CRUD data operations**
+- User data management
+- Content catalog queries
+- Submission lifecycle
+- Reviews and ratings
+- Watchlists and favorites
+- Subscription management
+
+✅ **Benefits:**
+- Strongly typed queries
+- Auto-generated client code (Amplify)
+- Real-time subscriptions
+- Built-in authorization with Cognito
+- Automatic caching
+- Single endpoint for all data operations
+
+#### **API Gateway (REST)** - Use For:
+✅ **HTTP-specific operations that can't be done in GraphQL:**
+- Setting HTTP cookies (CloudFront signed cookies)
+- Generating S3 pre-signed URLs
+- Media processing triggers (MediaConvert)
+- Webhook callbacks
+- Binary file uploads (though direct S3 is preferred)
+
+✅ **Benefits:**
+- Fine-grained control over HTTP headers
+- Cookie management
+- Custom response formatting
+- Legacy/third-party integration support
+
+### Integration Points
+
+#### 1. **Authentication Integration**
+Both APIs share the same authentication:
+```
+Cognito User Pool
+  │
+  ├─► AppSync Authorization
+  │   Uses @aws_auth directive
+  │   Validates JWT automatically
+  │
+  └─► API Gateway Authorization
+      Uses JWT Authorizer
+      Validates same JWT token
+      Extracts user info from token claims
+```
+
+#### 2. **Data Integration**
+Lambda functions can call AppSync:
+```
+Lambda Function
+  │
+  │ GraphQL Mutation/Query
+  │ (using AWS AppSync SDK)
+  ▼
+AppSync
+  │
+  │ Executes resolvers
+  ▼
+DynamoDB
+```
+
+#### 3. **Secrets Integration**
+Both can access Secrets Manager:
+```
+Lambda Functions
+  │
+  │ AWS SDK Secrets Manager
+  ▼
+Secrets Manager
+  │
+  ├─ CloudFront Private Keys
+  ├─ API Keys (third-party)
+  └─ Database Credentials
+```
+
+### Complete Request Example: Video Playback
+
+```
+1. User opens video player in app
+   └─► App calls: GET /api/play/ASSET001?tier=free&mode=video
+       Headers: Authorization: Bearer <idToken>
+
+2. CloudFront receives request
+   └─► Routes to: API Gateway /api/* origin
+
+3. API Gateway processes request
+   ├─► Validates JWT token with Cognito
+   ├─► Extracts user ID from token
+   └─► Invokes: PlayFunction Lambda
+
+4. Lambda Function execution
+   ├─► Reads user subscription from DynamoDB (or calls AppSync)
+   ├─► Retrieves CloudFront private key from Secrets Manager
+   ├─► Signs cookies for /assets/ASSET001/*
+   ├─► Generates manifest URL: /assets/ASSET001/hls/master_free.m3u8
+   └─► Returns JSON response + Set-Cookie headers
+
+5. API Gateway responds
+   └─► Returns HTTP 200 with cookies and manifest URL
+
+6. Client app receives response
+   ├─► Stores cookies automatically (HttpOnly, Secure)
+   └─► Requests manifest: GET /assets/ASSET001/hls/master_free.m3u8
+       Headers: Cookie: CloudFront-Policy=...; CloudFront-Signature=...; ...
+
+7. CloudFront validates cookies
+   ├─► Checks cookie signature
+   ├─► Validates policy (expiry, path restrictions)
+   └─► If valid: Serves from S3 via OAC
+
+8. Client receives manifest and segments
+   └─► Video player plays content
+```
+
+### CloudFront Behavior Configuration
+
+CloudFront acts as the **single entry point** routing requests based on path patterns:
+
+| Path Pattern | Origin | Cache Behavior | Purpose |
+|--------------|--------|----------------|---------|
+| `/assets/*` | S3 Bucket (OAC) | Cache enabled | Serve media files (HLS, DASH, MP4) |
+| `/api/*` | API Gateway | No cache | REST API endpoints |
+| `/graphql` | AppSync | No cache | GraphQL endpoint |
+
+**Key Configuration:**
+- **Origin A (S3)**: Requires signed cookies (CloudFront signed URLs/cookies)
+- **Origin B (API Gateway)**: No viewer restrictions (needs to set cookies)
+- **Origin C (AppSync)**: Uses AppSync's built-in authentication
+
+### Security & Authorization Flow
+
+```
+Client Request
+  │
+  ├─► Contains JWT Token: Authorization: Bearer <idToken>
+  │
+  ▼
+API Gateway / AppSync
+  │
+  ├─► Validates JWT against Cognito User Pool
+  │   ├─ Signature verification
+  │   ├─ Expiry check
+  │   └─ Audience validation
+  │
+  ├─► Extracts User Claims:
+  │   ├─ sub (user ID)
+  │   ├─ email
+  │   └─ cognito:groups (for role-based access)
+  │
+  └─► If valid:
+      ├─► API Gateway: Invokes Lambda with user context
+      └─► AppSync: Executes resolver with user identity
+```
+
+### Lambda Function Integration Pattern
+
+Each Lambda function receives the full request context from API Gateway:
+
+```typescript
+// Lambda Function Structure
+export const handler = async (event: APIGatewayProxyEvent) => {
+  // 1. Extract user from JWT (already validated by API Gateway)
+  const userId = event.requestContext.authorizer.claims.sub;
+  const email = event.requestContext.authorizer.claims.email;
+  
+  // 2. Extract route parameters
+  const assetId = event.pathParameters?.assetId;
+  const tier = event.queryStringParameters?.tier;
+  const mode = event.queryStringParameters?.mode;
+  
+  // 3. Business logic
+  const result = await processRequest(userId, assetId, tier, mode);
+  
+  // 4. Return formatted response
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': result.cookies // API Gateway handles multiple Set-Cookie
+    },
+    body: JSON.stringify(result.data)
+  };
+};
+```
+
+### AppSync Resolver Integration Pattern
+
+AppSync resolvers can connect directly to DynamoDB or use Lambda for complex logic:
+
+```graphql
+# Direct DynamoDB Resolver
+type Query {
+  getContent(contentId: ID!): Content
+}
+
+# Resolver Mapping Template (VTL)
+{
+  "version": "2017-02-28",
+  "operation": "GetItem",
+  "key": {
+    "contentId": $util.dynamodb.toDynamoDBJson($ctx.args.contentId)
+  }
+}
+```
+
+```graphql
+# Lambda Resolver (for complex logic)
+type Mutation {
+  createSubmission(input: CreateSubmissionInput!): Submission
+}
+
+# Resolver invokes Lambda with mutation arguments
+```
+
+### Data Flow Summary
+
+**GraphQL Operations (AppSync):**
+```
+Client → CloudFront → AppSync → DynamoDB → Response
+         (automatic)   (validates JWT)  (resolvers)
+```
+
+**REST Operations (API Gateway):**
+```
+Client → CloudFront → API Gateway → Lambda → DynamoDB/Secrets Manager → Response
+         (routes)      (validates JWT)  (business logic)  (data/keys)
+```
+
+**Media Streaming:**
+```
+Client → CloudFront → S3 (via OAC)
+         (validates cookies)  (serves media)
+```
+
+### When to Use Which API
+
+**Use AppSync when:**
+- ✅ Querying data (lists, single items, searches)
+- ✅ Creating/updating records (users, content, submissions)
+- ✅ Need real-time updates (subscriptions)
+- ✅ Working with relationships (user → submissions → reviews)
+- ✅ Need automatic code generation
+
+**Use API Gateway when:**
+- ✅ Need to set HTTP cookies
+- ✅ Generating pre-signed URLs
+- ✅ Triggering async jobs (MediaConvert, Step Functions)
+- ✅ Webhook callbacks
+- ✅ Operations that don't fit GraphQL patterns
+
+### Summary
+
+The architecture uses **AppSync for data** and **API Gateway for edge operations**, both secured by the same Cognito authentication. CloudFront provides a single domain for all requests, routing to the appropriate backend service based on the path pattern. This hybrid approach gives you the benefits of GraphQL for data operations while maintaining flexibility for HTTP-specific requirements.
+
+---
+
 ## 0) Prerequisites
 - **AWS account** with admin access (for initial setup only).
 - **Node.js 20+**, **npm** (or pnpm), **TypeScript** + **ts-node**.

@@ -23,6 +23,7 @@ import com.btd.maiscreen.ui.screens.SettingsScreen
 import com.btd.maiscreen.ui.screens.PurchaseMinutesScreen
 import com.btd.maiscreen.ui.screens.ProfileScreen
 import com.btd.maiscreen.ui.screens.UploadTemplateScreen
+import com.btd.maiscreen.ui.screens.MediaSubmissionScreen
 import com.btd.maiscreen.ui.screens.ContentItem
 import com.btd.maiscreen.config.AppSettings
 import com.btd.maiscreen.viewmodel.AppViewModel
@@ -39,6 +40,8 @@ fun App() {
         var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
         var selectedTier by remember { mutableStateOf<com.btd.maiscreen.ui.screens.SubscriptionTier?>(null) }
         var selectedContent by remember { mutableStateOf<ContentItem?>(null) }
+        var selectedContentType by remember { mutableStateOf("") }
+        var selectedSubType by remember { mutableStateOf("") }
         var pendingSignUpEmail by remember { mutableStateOf("") }
         var isSignUpLoading by remember { mutableStateOf(false) }
         
@@ -288,6 +291,8 @@ fun App() {
                             println("🚪 Logout clicked from settings")
                             AuthManager.logout()
                             AppAuthState.logout()
+                            // Navigate to login screen after logout
+                            currentScreen = AppScreen.Login
                         }
                     )
                 }
@@ -313,7 +318,22 @@ fun App() {
                         },
                         onNextClick = { type, subType ->
                             println("📤 Upload template selected: $type - $subType")
-                            // TODO: Navigate to next step in upload flow
+                            selectedContentType = type
+                            selectedSubType = subType
+                            currentScreen = AppScreen.MediaSubmission
+                        }
+                    )
+                }
+                AppScreen.MediaSubmission -> {
+                    MediaSubmissionScreen(
+                        contentType = selectedContentType,
+                        subType = selectedSubType,
+                        onBackClick = {
+                            currentScreen = AppScreen.UploadTemplate
+                        },
+                        onSubmitClick = { formData ->
+                            println("📤 Media submission: $formData")
+                            // TODO: Submit data to backend
                             currentScreen = AppScreen.Main
                         }
                     )
@@ -399,5 +419,6 @@ enum class AppScreen {
     Settings,
     PurchaseMinutes,
     UploadTemplate,
+    MediaSubmission,
     Profile
 }

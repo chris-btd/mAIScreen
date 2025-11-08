@@ -11,6 +11,7 @@ enum AppScreen {
     case videoPlayer
     case settings
     case uploadTemplate
+    case mediaSubmission
 }
 
 struct ContentView: View {
@@ -18,6 +19,8 @@ struct ContentView: View {
     @State private var selectedTier: SubscriptionTier?
     @State private var selectedContent: ContentItem?
     @State private var recentlyWatched: [ContentItem] = []
+    @State private var selectedContentType: String = ""
+    @State private var selectedSubType: String = ""
     @StateObject private var authService = AuthService.shared
     
     var body: some View {
@@ -160,6 +163,8 @@ struct ContentView: View {
                     onLogoutClick: {
                         print("🚪 iOS: Logout clicked from settings")
                         authService.logout()
+                        // Navigate to login screen after logout
+                        currentScreen = .login
                     }
                 )
             case .uploadTemplate:
@@ -169,7 +174,21 @@ struct ContentView: View {
                     },
                     onNextClick: { type, subType in
                         print("📤 iOS: Upload template selected: \(type) - \(subType)")
-                        // TODO: Navigate to next step in upload flow
+                        selectedContentType = type
+                        selectedSubType = subType
+                        currentScreen = .mediaSubmission
+                    }
+                )
+            case .mediaSubmission:
+                MediaSubmissionView(
+                    contentType: selectedContentType,
+                    subType: selectedSubType,
+                    onBackClick: {
+                        currentScreen = .uploadTemplate
+                    },
+                    onSubmitClick: { formData in
+                        print("📤 iOS: Media submission: \(formData)")
+                        // TODO: Submit data to backend
                         currentScreen = .main
                     }
                 )
