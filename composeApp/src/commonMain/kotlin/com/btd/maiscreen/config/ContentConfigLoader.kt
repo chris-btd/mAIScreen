@@ -1,10 +1,12 @@
 package com.btd.maiscreen.config
 
 import kotlinx.serialization.json.Json
+import maiscreen.composeapp.generated.resources.Res
+import org.jetbrains.compose.resources.ExperimentalResourceApi
 
 /**
  * Loader for content configuration
- * Currently loads from embedded JSON string, can be extended to load from file or API
+ * Loads from resource files
  */
 object ContentConfigLoader {
     private val json = Json {
@@ -12,16 +14,29 @@ object ContentConfigLoader {
         isLenient = true
     }
 
-    // In-memory cache
+    // Thread-safe cache using @Volatile and synchronization
+    @Volatile
     private var cachedConfig: ContentConfiguration? = null
+    private val cacheLock = Any()
 
     /**
      * Get the current configuration
      * Loads default config if not already loaded
      */
-    fun getConfig(): ContentConfiguration {
-        return cachedConfig ?: loadDefaultConfig().also {
-            cachedConfig = it
+    @OptIn(ExperimentalResourceApi::class)
+    suspend fun getConfig(): ContentConfiguration {
+        // Check if already cached
+        cachedConfig?.let { return it }
+
+        // Load config (thread-safe via synchronized on assignment only)
+        val newConfig = loadDefaultConfig()
+
+        // Thread-safe cache update
+        synchronized(cacheLock) {
+            // Check again in case another thread loaded it
+            cachedConfig?.let { return it }
+            cachedConfig = newConfig
+            return newConfig
         }
     }
 
@@ -29,8 +44,10 @@ object ContentConfigLoader {
      * Load configuration from a JSON string
      */
     fun loadConfig(jsonString: String): ContentConfiguration {
-        return json.decodeFromString<ContentConfiguration>(jsonString).also {
-            cachedConfig = it
+        return synchronized(cacheLock) {
+            json.decodeFromString<ContentConfiguration>(jsonString).also {
+                cachedConfig = it
+            }
         }
     }
 
@@ -38,97 +55,25 @@ object ContentConfigLoader {
      * Clear the cached configuration
      */
     fun clearCache() {
-        cachedConfig = null
+        synchronized(cacheLock) {
+            cachedConfig = null
+        }
     }
 
     /**
-     * Load the default embedded configuration
+     * Load the default configuration from resource file
      */
-    private fun loadDefaultConfig(): ContentConfiguration {
-        return json.decodeFromString(DEFAULT_CONFIG_JSON)
+    @OptIn(ExperimentalResourceApi::class)
+    private suspend fun loadDefaultConfig(): ContentConfiguration {
+        return try {
+            val jsonString = Res.readBytes("files/content_config.json")
+                .decodeToString()
+            json.decodeFromString(jsonString)
+        } catch (e: Exception) {
+            println("Error loading config from resources: ${e.message}")
+            // Fallback to minimal config if resource loading fails
+            throw IllegalStateException("Failed to load content configuration: ${e.message}", e)
+        }
     }
 }
 
-/**
- * Default embedded configuration JSON
- * This can be replaced with file loading or API fetching in the future
- */
-private const val DEFAULT_CONFIG_JSON = """
-{
-  "version": "1.0",
-  "hero": {
-    "contentId": "featured1",
-    "fallbackContentId": "1"
-  },
-  "categories": [
-    {
-      "id": "top10",
-      "name": "Top 10 Trending",
-      "type": "top10",
-      "order": 1,
-      "enabled": true,
-      "isTestOnly": false,
-      "contentIds": ["1", "2", "3", "4", "5", "6", "7", "comic1", "comic2", "comic3"],
-      "maxItems": 10
-    },
-    {
-      "id": "bhm",
-      "name": "Black History Month",
-      "type": "themed",
-      "order": 2,
-      "enabled": true,
-      "isTestOnly": false,
-      "contentIds": ["5", "6", "7"],
-      "themeColor": "#FFC107",
-      "themeIcon": "..."
-    },
-    {
-      "id": "trending",
-      "name": "Trending Now",
-      "type": "standard",
-      "order": 3,
-      "enabled": true,
-      "isTestOnly": false,
-      "contentIds": ["1", "2", "3", "4"]
-    },
-    {
-      "id": "ai_originals",
-      "name": "AI Originals",
-      "type": "standard",
-      "order": 4,
-      "enabled": true,
-      "isTestOnly": false,
-      "contentIds": ["5", "6"]
-    },
-    {
-      "id": "popular",
-      "name": "Popular This Week",
-      "type": "standard",
-      "order": 5,
-      "enabled": true,
-      "isTestOnly": false,
-      "contentIds": ["7"]
-    },
-    {
-      "id": "comics",
-      "name": "Comic Books",
-      "type": "standard",
-      "order": 6,
-      "enabled": true,
-      "isTestOnly": false,
-      "contentIds": ["comic1", "comic2", "comic3", "comic4"]
-    }
-  ],
-  "testCategories": [
-    {
-      "id": "test",
-      "name": "Test",
-      "type": "standard",
-      "order": 0,
-      "enabled": true,
-      "isTestOnly": true,
-      "contentIds": ["TEST001"]
-    }
-  ]
-}
-"""

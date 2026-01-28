@@ -103,8 +103,14 @@ android {
         buildConfig = true
     }
     buildTypes {
+        getByName("debug") {
+            // Enable test mode only in debug builds
+            buildConfigField("boolean", "IS_TEST_MODE", "true")
+        }
         getByName("release") {
             isMinifyEnabled = false
+            // Disable test mode in release builds for security
+            buildConfigField("boolean", "IS_TEST_MODE", "false")
         }
     }
     compileOptions {

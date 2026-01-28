@@ -194,14 +194,14 @@ fun SettingsScreen(
                     )
                     
                     Text(
-                        text = "Toggle between test data and AWS API (Dev builds)",
+                        text = "Controlled by build configuration for security (Debug = Test, Release = AWS)",
                         fontSize = 14.sp,
                         color = Color.Gray
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
-                    // Data Source Toggle
+                    // Data Source Status (Read-only - controlled by build configuration)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -211,34 +211,32 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "Use Test Data",
+                                text = "Test Data Mode",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = Color.Black
                             )
                             Text(
                                 text = if (useTestData) {
-                                    "🧪 Using hardcoded test content"
+                                    "🧪 Using hardcoded test content (Debug Build)"
                                 } else {
-                                    "☁️ Fetching from AWS API"
+                                    "☁️ Fetching from AWS API (Release Build)"
                                 },
                                 fontSize = 12.sp,
                                 color = if (useTestData) Color(0xFF059669) else Color(0xFF1E3A8A)
                             )
                         }
-                        
+
+                        // Switch is now disabled - test mode controlled by build configuration
                         Switch(
                             checked = useTestData,
-                            onCheckedChange = { newValue ->
-                                AppSettings.toggleTestData()
-                                useTestData = newValue // Update local state for immediate UI refresh
-                                // Note: MainScreen will need to reload after this change
-                            },
+                            onCheckedChange = { },  // No-op: cannot be changed at runtime
+                            enabled = false,  // SECURITY: Disabled to prevent runtime changes
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0xFF059669), // Green when ON (test data)
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = Color(0xFF1E3A8A) // Blue when OFF (AWS)
+                                disabledCheckedThumbColor = Color.White,
+                                disabledCheckedTrackColor = Color(0xFF059669), // Green when ON (test data)
+                                disabledUncheckedThumbColor = Color.White,
+                                disabledUncheckedTrackColor = Color(0xFF1E3A8A) // Blue when OFF (AWS)
                             )
                         )
                     }
@@ -273,9 +271,9 @@ fun SettingsScreen(
                             }
                             Text(
                                 text = if (useTestData) {
-                                    "• Uses hardcoded test content\n• No network calls required\n• Perfect for UI testing\n• Fast and predictable data"
+                                    "• Uses hardcoded test content\n• No network calls required\n• Perfect for UI testing\n• Fast and predictable data\n• 🔒 Secured: Only in debug builds"
                                 } else {
-                                    "• Fetches content from AWS API\n• Requires backend integration\n• Tests real API endpoints\n• Updates with real data changes"
+                                    "• Fetches content from AWS API\n• Requires backend integration\n• Tests real API endpoints\n• Updates with real data changes\n• 🔒 Production mode: Test content disabled"
                                 },
                                 fontSize = 12.sp,
                                 color = Color(0xFF374151),
