@@ -3,6 +3,7 @@ package com.btd.maiscreen.auth
 import com.amplifyframework.auth.AuthUserAttribute
 import com.amplifyframework.auth.AuthUserAttributeKey
 import com.amplifyframework.core.Amplify
+import com.btd.maiscreen.util.PasswordValidator
 import com.btd.maiscreen.util.SecureLogger
 
 /**
@@ -29,6 +30,12 @@ class AmplifyAuthService {
      * Sign up a new user with email and password
      */
     fun signUp(firstName: String, lastName: String, email: String, password: String, birthdate: String) {
+        val passwordValidation = PasswordValidator.validate(password)
+        if (!passwordValidation.isValid) {
+            onSignUpError?.invoke(passwordValidation.errors.firstOrNull() ?: "Password does not meet requirements")
+            return
+        }
+
         SecureLogger.d(TAG, "Starting sign up")
 
         val attributes = listOf(
@@ -83,12 +90,12 @@ class AmplifyAuthService {
      * Resend confirmation code
      */
     fun resendConfirmationCode(username: String) {
-        SecureLogger.d(TAG,"📧 Resending confirmation code for: $username")
-        
+        SecureLogger.d(TAG, "Resending confirmation code")
+
         Amplify.Auth.resendSignUpCode(
             username,
             { result ->
-                SecureLogger.d(TAG,"✅ Confirmation code resent to: ${result.destination}")
+                SecureLogger.d(TAG, "Confirmation code resent successfully")
             },
             { error ->
                 SecureLogger.e(TAG,"❌ Failed to resend confirmation code", error)
@@ -101,25 +108,24 @@ class AmplifyAuthService {
      * Sign in with email and password
      */
     fun signIn(email: String, password: String) {
-        SecureLogger.d(TAG,"🔑 Signing in: $email")
-        
+        SecureLogger.d(TAG, "Signing in")
+
         Amplify.Auth.signIn(
             email,
             password,
             { result ->
-                SecureLogger.d(TAG,"✅ Sign in succeeded for: $email")
-                SecureLogger.d(TAG,"Sign in complete: ${result.isSignedIn}")
-                
+                SecureLogger.d(TAG, "Sign in complete: ${result.isSignedIn}")
+
                 if (result.isSignedIn) {
                     onSignInSuccess?.invoke()
                 } else {
-                    SecureLogger.d(TAG,"Additional steps required: ${result.nextStep}")
+                    SecureLogger.d(TAG, "Additional steps required: ${result.nextStep}")
                     // Handle MFA or other additional steps if needed
                     onSignInError?.invoke("Additional authentication steps required")
                 }
             },
             { error ->
-                SecureLogger.e(TAG,"❌ Sign in failed for: $email", error)
+                SecureLogger.e(TAG, "Sign in failed", error)
                 onSignInError?.invoke(error.message ?: "Sign in failed")
             }
         )
@@ -180,7 +186,7 @@ class AmplifyAuthService {
     fun getCurrentUser() {
         Amplify.Auth.getCurrentUser(
             { user ->
-                SecureLogger.d(TAG,"Current user: ${user.username}")
+                SecureLogger.d(TAG, "Current user retrieved")
             },
             { error ->
                 SecureLogger.e(TAG,"Failed to get current user", error)
@@ -202,7 +208,7 @@ class AmplifyAuthService {
                     // Get current user details to retrieve email
                     Amplify.Auth.getCurrentUser(
                         { user ->
-                            SecureLogger.d(TAG,"Current authenticated user: ${user.username}")
+                            SecureLogger.d(TAG, "Current authenticated user retrieved")
                             onAuthCheckSuccess?.invoke(user.username)
                         },
                         { error ->

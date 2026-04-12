@@ -9,9 +9,10 @@ import com.btd.maiscreen.model.Success
 import com.btd.maiscreen.repository.ContentRepository
 import com.btd.maiscreen.ui.screens.ContentItem
 import com.btd.maiscreen.ui.state.MainScreenUiState
+import com.btd.maiscreen.util.ErrorMessageSanitizer
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 
 /**
  * ViewModel for MainScreen following Clean Architecture pattern
@@ -28,24 +29,6 @@ class MainScreenViewModel(
 
     init {
         loadContent()
-    }
-
-    /**
-     * Sanitize error messages to prevent XSS and limit sensitive information exposure
-     */
-    private fun sanitizeErrorMessage(message: String): String {
-        // Remove any potential HTML/script tags and limit length
-        val sanitized = message
-            .replace(Regex("<[^>]*>"), "")
-            .replace(Regex("javascript:"), "")
-            .take(200) // Limit message length
-
-        // If message contains stack traces or paths, use generic message
-        return if (sanitized.contains(Regex("at \\w+\\.\\w+")) || sanitized.contains("/")) {
-            "An error occurred. Please try again later."
-        } else {
-            sanitized.ifEmpty { "An error occurred. Please try again later." }
-        }
     }
 
     /**
@@ -80,7 +63,7 @@ class MainScreenViewModel(
                         setState {
                             copy(
                                 hasError = true,
-                                errorMessage = sanitizeErrorMessage("Failed to load featured content: ${featuredResult.message}")
+                                errorMessage = ErrorMessageSanitizer.sanitize("Failed to load featured content: ${featuredResult.message}")
                             )
                         }
                     }
@@ -108,7 +91,7 @@ class MainScreenViewModel(
                         setState {
                             copy(
                                 hasError = true,
-                                errorMessage = sanitizeErrorMessage("Failed to load categories: ${categoriesResult.message}"),
+                                errorMessage = ErrorMessageSanitizer.sanitize("Failed to load categories: ${categoriesResult.message}"),
                                 isLoading = false
                             )
                         }
@@ -165,7 +148,7 @@ class MainScreenViewModel(
      */
     fun toggleLike(content: ContentItem) {
         // Debounce: Prevent rapid-fire requests
-        val currentTime = System.currentTimeMillis()
+        val currentTime = Clock.System.now().toEpochMilliseconds()
         if (currentTime - lastLikeActionTime < debounceDelay) {
             return
         }
@@ -193,7 +176,7 @@ class MainScreenViewModel(
                         setState {
                             copy(
                                 hasError = true,
-                                errorMessage = sanitizeErrorMessage("Failed to update like: ${result.message}")
+                                errorMessage = ErrorMessageSanitizer.sanitize("Failed to update like: ${result.message}")
                             )
                         }
                     }
@@ -222,7 +205,7 @@ class MainScreenViewModel(
      */
     fun toggleWatchlist(content: ContentItem) {
         // Debounce: Prevent rapid-fire requests
-        val currentTime = System.currentTimeMillis()
+        val currentTime = Clock.System.now().toEpochMilliseconds()
         if (currentTime - lastWatchlistActionTime < debounceDelay) {
             return
         }
@@ -266,7 +249,7 @@ class MainScreenViewModel(
                         setState {
                             copy(
                                 hasError = true,
-                                errorMessage = sanitizeErrorMessage("Failed to update watchlist: ${result.message}")
+                                errorMessage = ErrorMessageSanitizer.sanitize("Failed to update watchlist: ${result.message}")
                             )
                         }
                     }

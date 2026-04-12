@@ -30,19 +30,27 @@ object SecureLogger {
 
     /**
      * Log a warning message
+     * Suppressed in release builds — warning messages can contain sensitive context.
      */
     fun w(tag: String, message: String) {
-        Log.w(tag, sanitizeMessage(message))
+        if (BuildConfig.DEBUG) {
+            Log.w(tag, sanitizeMessage(message))
+        }
     }
 
     /**
      * Log an error message
+     * Suppressed in release builds — error messages can contain sensitive context
+     * such as server responses or internal state. Use crash reporting tools for
+     * production error observability instead.
      */
     fun e(tag: String, message: String, throwable: Throwable? = null) {
-        if (throwable != null) {
-            Log.e(tag, sanitizeMessage(message), throwable)
-        } else {
-            Log.e(tag, sanitizeMessage(message))
+        if (BuildConfig.DEBUG) {
+            if (throwable != null) {
+                Log.e(tag, sanitizeMessage(message), throwable)
+            } else {
+                Log.e(tag, sanitizeMessage(message))
+            }
         }
     }
 

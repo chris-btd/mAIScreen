@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.btd.maiscreen.ui.screens.ContentItem
+import com.btd.maiscreen.util.ErrorMessageSanitizer
 
 /**
  * ViewModel for managing app-wide UI state and error messages
@@ -29,8 +30,7 @@ class AppViewModel : ViewModel() {
     
     // Show error message
     fun showError(message: String) {
-        // Sanitize error message to prevent XSS
-        errorMessage = sanitizeErrorMessage(message)
+        errorMessage = ErrorMessageSanitizer.sanitize(message)
     }
 
     // Clear error message
@@ -53,23 +53,6 @@ class AppViewModel : ViewModel() {
         isLoading = loading
     }
 
-    /**
-     * Sanitize error messages to prevent XSS and limit sensitive information exposure
-     */
-    private fun sanitizeErrorMessage(message: String): String {
-        // Remove any potential HTML/script tags
-        val sanitized = message
-            .replace(Regex("<[^>]*>"), "")
-            .replace(Regex("javascript:", ""), "")
-
-        // If message is too detailed (contains stack traces or paths), use generic message
-        return if (sanitized.contains(Regex("at \\w+\\.\\w+")) || sanitized.contains("/") || sanitized.length > 200) {
-            "An error occurred. Please try again later."
-        } else {
-            sanitized
-        }
-    }
-    
     // Clear all messages
     fun clearAllMessages() {
         errorMessage = null

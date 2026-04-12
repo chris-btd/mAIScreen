@@ -20,15 +20,12 @@
     <domain-config>
         <!-- CloudFront domain - enforce HTTPS -->
         <domain includeSubdomains="true">cloudfront.net</domain>
-        <pin-set expiration="2026-01-01">
-            <!-- TODO: Add certificate pins for CloudFront domain -->
-            <!-- To get certificate pins, run:
-                 openssl s_client -connect your-domain.cloudfront.net:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
-            -->
-            <!-- Example pin (replace with actual):
-            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
-            -->
-        </pin-set>
+        <!-- TODO: Add <pin-set> with actual SHA-256 pins before production.
+             To obtain pins, run:
+             openssl s_client -connect your-domain.cloudfront.net:443 | \
+               openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | \
+               openssl dgst -sha256 -binary | openssl enc -base64
+        -->
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
