@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,7 +22,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil3.compose.AsyncImage
+import com.btd.maiscreen.config.CategoryType
 import com.btd.maiscreen.ui.state.MainScreenUiState
 import com.btd.maiscreen.viewmodel.MainScreenViewModel
 import kotlinx.coroutines.flow.StateFlow
@@ -50,12 +59,18 @@ data class ContentItem(
     val director: String,
     val assetId: String = id, // Use ID as asset ID by default
     val isLiked: Boolean = false,
-    val isInWatchlist: Boolean = false
+    val isInWatchlist: Boolean = false,
+    val imageUrl: String? = null,  // URL for content thumbnail
+    val backdropUrl: String? = null  // URL for hero background
 )
 
 data class ContentCategory(
+    val id: String = "",
     val name: String,
-    val items: List<ContentItem>
+    val type: CategoryType = CategoryType.STANDARD,
+    val items: List<ContentItem>,
+    val themeColor: Color? = null,
+    val themeIcon: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,19 +89,16 @@ fun MainScreen(
 ) {
     // Collect UI state from ViewModel
     val uiState by viewModel.state.collectAsState()
-    val navyBlue = Color(0xFF1B2951)
-    val black = Color(0xFF000000)
-    val starWhite = Color(0xFFFFFFFF)
-    
+
     // Drawer state
     var showDrawer by remember { mutableStateOf(false) }
-    
+
     // Handle loading state
     if (uiState.isLoading) {
         LoadingScreen()
         return
     }
-    
+
     // Handle error state
     if (uiState.hasError) {
         ErrorScreen(
@@ -95,47 +107,17 @@ fun MainScreen(
         )
         return
     }
-    
+
     // Get data from ViewModel state
     val featuredContent = uiState.featuredContent
     val contentCategories = uiState.contentCategories
     val watchList = uiState.watchList
-    
-    // Generate random stars for background
-    val stars = remember {
-        List(100) {
-            Offset(
-                x = Random.nextFloat(),
-                y = Random.nextFloat()
-            )
-        }
-    }
-    
+
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
     ) {
-        // Background gradient with stars
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val gradient = Brush.verticalGradient(
-                colors = listOf(black, navyBlue),
-                startY = 0f,
-                endY = size.height
-            )
-            drawRect(gradient)
-            
-            // Draw stars
-            stars.forEach { star ->
-                val starSize = Random.nextFloat() * 2f + 1f
-                drawCircle(
-                    color = starWhite.copy(alpha = Random.nextFloat() * 0.3f + 0.1f),
-                    radius = starSize,
-                    center = Offset(
-                        x = star.x * size.width,
-                        y = star.y * size.height
-                    )
-                )
-            }
-        }
         
         Column(
             modifier = Modifier
@@ -320,104 +302,188 @@ private fun FeaturedContentHero(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(400.dp)
-            .padding(horizontal = 24.dp)
+            .height(500.dp)
     ) {
-        // Featured content background
-        Card(
-            modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = content.thumbnailColor
-            )
-        ) {
-            Box(
+        // Image background
+        if (content.backdropUrl != null) {
+            AsyncImage(
+                model = content.backdropUrl,
+                contentDescription = content.title,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
-            ) {
-                // Gradient overlay for text readability
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.7f)
-                                ),
-                                startY = 0f,
-                                endY = Float.POSITIVE_INFINITY
-                            )
+            )
+        } else {
+            // Fallback to solid color if no image
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(content.thumbnailColor)
+            )
+        }
+
+        // Bottom gradient overlay (from black to transparent)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.7f)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.5f),
+                            Color.Black
                         )
+                    )
                 )
-                
-                // Content info
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+        )
+
+        // Left gradient overlay (from black to transparent)
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(0.6f)
+                .align(Alignment.CenterStart)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.8f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // Content info
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 48.dp, vertical = 48.dp)
+                .fillMaxWidth(0.6f),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = content.title,
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        offset = Offset(2f, 2f),
+                        blurRadius = 4f
+                    )
+                )
+            )
+
+            Text(
+                text = content.description,
+                fontSize = 18.sp,
+                color = Color.White.copy(alpha = 0.9f),
+                lineHeight = 26.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Rating badge
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF46D369)
+                    ),
+                    shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = content.title,
-                        fontSize = 32.sp,
+                        text = "${content.rating}",
+                        fontSize = 14.sp,
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
-                    
+                }
+
+                Text(
+                    text = content.duration,
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+
+                Text(
+                    text = content.year,
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+
+                // Age rating badge
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.2f)
+                    ),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
                     Text(
-                        text = content.description,
-                        fontSize = 16.sp,
-                        color = Color.White.copy(alpha = 0.9f),
-                        lineHeight = 22.sp,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+                        text = content.ageRating,
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = content.rating,
-                            fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontWeight = FontWeight.Medium
-                        )
-                        
-                        Text(
-                            text = content.duration,
-                            fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                        
-                        Text(
-                            text = content.category,
-                            fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Play button
-                    Button(
-                        onClick = onPlayClick,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "▶️",
-                            fontSize = 16.sp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Play",
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Action buttons row
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Play button - white fill
+                Button(
+                    onClick = onPlayClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Text(
+                        text = "▶",
+                        fontSize = 18.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Play",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+
+                // More Info button - semi-transparent
+                Button(
+                    onClick = { },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.3f),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Text(
+                        text = "ℹ",
+                        fontSize = 18.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "More Info",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp
+                    )
                 }
             }
         }
@@ -550,27 +616,250 @@ private fun ContentCategorySection(
     onToggleWatchlist: (ContentItem) -> Unit
 ) {
     Column {
-        Text(
-            text = category.name,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-        )
-        
+        // Use themed header for themed categories, standard header for others
+        when (category.type) {
+            CategoryType.THEMED -> {
+                ThemedCategoryHeader(
+                    name = category.name,
+                    themeIcon = category.themeIcon,
+                    themeColor = category.themeColor
+                )
+            }
+            else -> {
+                Text(
+                    text = category.name,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+            }
+        }
+
         LazyRow(
             contentPadding = PaddingValues(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(
+                if (category.type == CategoryType.TOP_10) 48.dp else 12.dp
+            )
         ) {
-            items(category.items) { item ->
-                EnhancedContentCard(
-                    content = item,
-                    onClick = { onContentClick(item) },
-                    onShowDetails = { onShowDetails(item) },
-                    onPlay = { onPlayContent(item) },
-                    onToggleLike = { onToggleLike(item) },
-                    onToggleWatchlist = { onToggleWatchlist(item) }
+            itemsIndexed(category.items) { index, item ->
+                when (category.type) {
+                    CategoryType.TOP_10 -> {
+                        Top10ContentCard(
+                            content = item,
+                            rank = index + 1,
+                            onClick = { onContentClick(item) },
+                            onShowDetails = { onShowDetails(item) },
+                            onPlay = { onPlayContent(item) },
+                            onToggleLike = { onToggleLike(item) },
+                            onToggleWatchlist = { onToggleWatchlist(item) }
+                        )
+                    }
+                    else -> {
+                        EnhancedContentCard(
+                            content = item,
+                            onClick = { onContentClick(item) },
+                            onShowDetails = { onShowDetails(item) },
+                            onPlay = { onPlayContent(item) },
+                            onToggleLike = { onToggleLike(item) },
+                            onToggleWatchlist = { onToggleWatchlist(item) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemedCategoryHeader(
+    name: String,
+    themeIcon: String?,
+    themeColor: Color?
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        themeIcon?.let {
+            Text(
+                text = it,
+                fontSize = 24.sp
+            )
+        }
+        Text(
+            text = name,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = themeColor ?: Color.White
+        )
+        themeColor?.let {
+            // Colored underline indicator
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(2.dp)
+                    .background(it.copy(alpha = 0.5f))
+            )
+        }
+    }
+}
+
+@Composable
+private fun Top10ContentCard(
+    content: ContentItem,
+    rank: Int,
+    onClick: () -> Unit,
+    onShowDetails: () -> Unit,
+    onPlay: () -> Unit,
+    onToggleLike: () -> Unit,
+    onToggleWatchlist: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isHovered) 1.05f else 1f,
+        label = "top10_card_scale"
+    )
+
+    Row(
+        modifier = Modifier
+            .height(200.dp)
+            .scale(scale),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        // Large outlined rank number
+        Box(
+            modifier = Modifier
+                .width(80.dp)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            // Background fill text (black)
+            Text(
+                text = rank.toString(),
+                fontSize = 140.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.Black,
+                modifier = Modifier.offset(x = (-10).dp, y = 30.dp)
+            )
+            // Outline text (white stroke effect using shadow)
+            Text(
+                text = rank.toString(),
+                fontSize = 140.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.Transparent,
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = Color.White,
+                        offset = Offset(0f, 0f),
+                        blurRadius = 0f
+                    ),
+                    drawStyle = Stroke(
+                        width = 4f,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                ),
+                modifier = Modifier.offset(x = (-10).dp, y = 30.dp)
+            )
+        }
+
+        // Content card - 2:3 aspect ratio (poster style)
+        Card(
+            modifier = Modifier
+                .width(130.dp)
+                .aspectRatio(2f / 3f)  // 2:3 poster aspect ratio
+                .offset(x = (-25).dp)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null
+                ) {
+                    onShowDetails()
+                },
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = content.thumbnailColor
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (isHovered) 12.dp else 4.dp
+            )
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Image background
+                if (content.imageUrl != null) {
+                    AsyncImage(
+                        model = content.imageUrl,
+                        contentDescription = content.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                // Gradient overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.8f)
+                                )
+                            )
+                        )
                 )
+                // Hover overlay
+                if (isHovered) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        IconButton(
+                            onClick = onPlay,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    Color.White,
+                                    RoundedCornerShape(22.dp)
+                                )
+                        ) {
+                            Text(
+                                text = "▶",
+                                fontSize = 18.sp,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+
+                // Title at bottom
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = content.title,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
@@ -587,41 +876,45 @@ private fun EnhancedContentCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    
+
     val scale by animateFloatAsState(
         targetValue = if (isHovered) 1.05f else 1f,
         label = "card_scale"
     )
-    
+
     Card(
         modifier = Modifier
-            .width(160.dp)
-            .height(240.dp)
+            .width(200.dp)
+            .aspectRatio(16f / 9f)  // 16:9 aspect ratio
             .scale(scale)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
-            ) { 
-                if (isHovered) {
-                    // On desktop/web, clicking when hovered shows details
-                    onShowDetails()
-                } else {
-                    // On mobile, single click shows details
-                    onShowDetails()
-                }
+            ) {
+                onShowDetails()
             },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = content.thumbnailColor
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isHovered) 8.dp else 4.dp
+            defaultElevation = if (isHovered) 12.dp else 4.dp
         )
     ) {
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Gradient overlay
+            // Image background
+            if (content.imageUrl != null) {
+                AsyncImage(
+                    model = content.imageUrl,
+                    contentDescription = content.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // Gradient overlay for text readability
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -629,29 +922,24 @@ private fun EnhancedContentCard(
                         Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = if (isHovered) 0.8f else 0.6f)
-                            ),
-                            startY = 0f,
-                            endY = Float.POSITIVE_INFINITY
+                                Color.Transparent,
+                                Color.Black.copy(alpha = if (isHovered) 0.9f else 0.7f)
+                            )
                         )
                     )
             )
-            
+
             // Hover overlay with action buttons
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isHovered,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
-            ) {
+            if (isHovered) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.7f))
+                        .background(Color.Black.copy(alpha = 0.6f))
                 ) {
                     Column(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(16.dp),
+                            .padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -659,69 +947,84 @@ private fun EnhancedContentCard(
                         IconButton(
                             onClick = onPlay,
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(44.dp)
                                 .background(
                                     Color.White,
-                                    RoundedCornerShape(24.dp)
+                                    RoundedCornerShape(22.dp)
                                 )
                         ) {
                             Text(
-                                text = "▶️",
-                                fontSize = 20.sp,
+                                text = "▶",
+                                fontSize = 18.sp,
                                 color = Color.Black
                             )
                         }
-                        
+
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             // Like button
                             IconButton(
                                 onClick = onToggleLike,
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(28.dp)
                                     .background(
                                         Color.White.copy(alpha = 0.2f),
-                                        RoundedCornerShape(16.dp)
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        Color.White.copy(alpha = 0.5f),
+                                        RoundedCornerShape(14.dp)
                                     )
                             ) {
                                 Text(
                                     text = if (content.isLiked) "❤️" else "🤍",
-                                    fontSize = 14.sp
+                                    fontSize = 12.sp
                                 )
                             }
-                            
+
                             // Watchlist button
                             IconButton(
                                 onClick = onToggleWatchlist,
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(28.dp)
                                     .background(
                                         Color.White.copy(alpha = 0.2f),
-                                        RoundedCornerShape(16.dp)
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        Color.White.copy(alpha = 0.5f),
+                                        RoundedCornerShape(14.dp)
                                     )
                             ) {
                                 Text(
                                     text = if (content.isInWatchlist) "✓" else "+",
-                                    fontSize = 14.sp,
+                                    fontSize = 12.sp,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            
+
                             // More info button
                             IconButton(
                                 onClick = onShowDetails,
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(28.dp)
                                     .background(
                                         Color.White.copy(alpha = 0.2f),
-                                        RoundedCornerShape(16.dp)
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        Color.White.copy(alpha = 0.5f),
+                                        RoundedCornerShape(14.dp)
                                     )
                             ) {
                                 Text(
-                                    text = "i",
-                                    fontSize = 14.sp,
+                                    text = "ⓘ",
+                                    fontSize = 12.sp,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -729,39 +1032,29 @@ private fun EnhancedContentCard(
                         }
                     }
                 }
-            }
-            
-            // Content info (always visible)
-            androidx.compose.animation.AnimatedVisibility(
-                visible = !isHovered,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Column(
+
+                // Title overlay at bottom (visible on hover)
+                Box(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black
+                                )
+                            )
+                        )
+                        .padding(12.dp)
                 ) {
                     Text(
                         text = content.title,
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = Color.White,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
-                    )
-                    
-                    Text(
-                        text = content.rating,
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                    
-                    Text(
-                        text = content.duration,
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.7f)
                     )
                 }
             }

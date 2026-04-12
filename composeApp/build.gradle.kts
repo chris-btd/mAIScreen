@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -46,6 +47,9 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor)
             implementation(projects.shared)
         }
         commonTest.dependencies {
@@ -113,8 +117,14 @@ android {
         buildConfig = true
     }
     buildTypes {
+        getByName("debug") {
+            // Enable test mode only in debug builds
+            buildConfigField("boolean", "IS_TEST_MODE", "true")
+        }
         getByName("release") {
             isMinifyEnabled = false
+            // Disable test mode in release builds for security
+            buildConfigField("boolean", "IS_TEST_MODE", "false")
         }
     }
     compileOptions {
