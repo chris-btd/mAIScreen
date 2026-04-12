@@ -74,10 +74,17 @@ fun MediaSubmissionScreen(
     var host by remember { mutableStateOf("") }
     var author by remember { mutableStateOf("") }
     
-    // Generate stars for background
+    // Generate stars for background — size and alpha are remembered here so they don't
+    // re-randomise on every Canvas draw, preventing visual flicker.
+    // Each entry: [x, y, size, alpha]
     val stars = remember {
-        (1..50).map {
-            Pair(Random.nextFloat(), Random.nextFloat())
+        List(50) {
+            floatArrayOf(
+                Random.nextFloat(),
+                Random.nextFloat(),
+                Random.nextFloat() * 2f + 1f,
+                Random.nextFloat() * 0.3f + 0.1f
+            )
         }
     }
     
@@ -103,16 +110,12 @@ fun MediaSubmissionScreen(
             )
             drawRect(gradient)
             
-            // Draw stars
+            // Draw stars using pre-computed size/alpha to avoid per-frame randomisation
             stars.forEach { star ->
-                val starSize = Random.nextFloat() * 2f + 1f
                 drawCircle(
-                    color = starWhite.copy(alpha = Random.nextFloat() * 0.3f + 0.1f),
-                    radius = starSize,
-                    center = Offset(
-                        x = star.first * size.width,
-                        y = star.second * size.height
-                    )
+                    color = starWhite.copy(alpha = star[3]),
+                    radius = star[2],
+                    center = Offset(x = star[0] * size.width, y = star[1] * size.height)
                 )
             }
         }

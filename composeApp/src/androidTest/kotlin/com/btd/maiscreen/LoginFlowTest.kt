@@ -1,5 +1,6 @@
 package com.btd.maiscreen
 
+import com.btd.maiscreen.BuildConfig
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.espresso.Espresso
@@ -25,8 +26,10 @@ class LoginFlowTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     companion object {
-        private const val TEST_EMAIL = "chris@test.com"
-        private const val TEST_PASSWORD = "Test@123"
+        // Credentials are injected via build.gradle.kts from environment variables or local.properties.
+        // Set TEST_EMAIL and TEST_PASSWORD in your CI/CD environment or local.properties (not committed).
+        private val TEST_EMAIL: String = BuildConfig.TEST_EMAIL
+        private val TEST_PASSWORD: String = BuildConfig.TEST_PASSWORD
     }
 
     @Before

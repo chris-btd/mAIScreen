@@ -40,12 +40,16 @@ fun LoginScreen(
     val black = Color(0xFF000000)
     val starWhite = Color(0xFFFFFFFF)
     
-    // Generate random stars
+    // Generate random stars — size and alpha are remembered here so they don't
+    // re-randomise on every Canvas draw, preventing visual flicker.
+    // Each entry: [x, y, size, alpha]
     val stars = remember {
         List(80) {
-            Offset(
-                x = Random.nextFloat(),
-                y = Random.nextFloat() * 0.5f // Stars only in the top 50% (black area)
+            floatArrayOf(
+                Random.nextFloat(),
+                Random.nextFloat() * 0.5f,
+                Random.nextFloat() * 3f + 1.5f,
+                Random.nextFloat() * 0.8f + 0.2f
             )
         }
     }
@@ -63,16 +67,12 @@ fun LoginScreen(
             )
             drawRect(gradient)
             
-            // Draw stars
+            // Draw stars using pre-computed size/alpha to avoid per-frame randomisation
             stars.forEach { star ->
-                val starSize = Random.nextFloat() * 3f + 1.5f
                 drawCircle(
-                    color = starWhite.copy(alpha = Random.nextFloat() * 0.8f + 0.2f),
-                    radius = starSize,
-                    center = Offset(
-                        x = star.x * size.width,
-                        y = star.y * size.height
-                    )
+                    color = starWhite.copy(alpha = star[3]),
+                    radius = star[2],
+                    center = Offset(x = star[0] * size.width, y = star[1] * size.height)
                 )
             }
         }

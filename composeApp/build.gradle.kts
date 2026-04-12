@@ -82,6 +82,8 @@ android {
         // TEST_PASSWORD=your-test-password
         // COGNITO_ISSUER_URI=https://cognito-idp.region.amazonaws.com/your-user-pool-id
         // COGNITO_CLIENT_ID=your-cognito-client-id
+        // COGNITO_POOL_ID=us-east-1_YourPoolId          (injected into awsconfiguration.json)
+        // COGNITO_APP_CLIENT_ID=your-app-client-id      (injected into awsconfiguration.json)
 
         val cloudfrontDomain = System.getenv("CLOUDFRONT_DOMAIN") ?: findProperty("CLOUDFRONT_DOMAIN") as? String ?: ""
         val testEmail = System.getenv("TEST_EMAIL") ?: findProperty("TEST_EMAIL") as? String ?: ""
@@ -132,6 +134,29 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
+
+// Inject real AWS Cognito credentials from environment/local.properties into
+// awsconfiguration.json at build time. The file committed to the repo uses
+// placeholder strings; this task replaces them when the env vars are set.
+val injectAwsConfig by tasks.registering {
+    doLast {
+        val poolId = System.getenv("COGNITO_POOL_ID")
+            ?: findProperty("COGNITO_POOL_ID") as? String ?: ""
+        val appClientId = System.getenv("COGNITO_APP_CLIENT_ID")
+            ?: findProperty("COGNITO_APP_CLIENT_ID") as? String ?: ""
+        if (poolId.isNotEmpty() && appClientId.isNotEmpty()) {
+            val configFile = file("src/androidMain/res/raw/awsconfiguration.json")
+            val updated = configFile.readText()
+                .replace("\"YOUR_COGNITO_POOL_ID\"", "\"$poolId\"")
+                .replace("\"YOUR_COGNITO_APP_CLIENT_ID\"", "\"$appClientId\"")
+            configFile.writeText(updated)
+            println("✅ awsconfiguration.json updated with Cognito credentials from environment")
+        } else {
+            println("⚠️  COGNITO_POOL_ID / COGNITO_APP_CLIENT_ID not set — awsconfiguration.json uses placeholder values")
+        }
+    }
+}
+tasks.named("preBuild") { dependsOn(injectAwsConfig) }
 
 dependencies {
     debugImplementation(compose.uiTooling)

@@ -25,7 +25,9 @@ class MainScreenViewModel(
     // Debouncing timestamps for user actions
     private var lastLikeActionTime = 0L
     private var lastWatchlistActionTime = 0L
+    private var lastRetryTime = 0L
     private val debounceDelay = 500L // milliseconds
+    private val retryDebounce = 2000L // 2-second cooldown for content reload
 
     init {
         loadContent()
@@ -281,9 +283,12 @@ class MainScreenViewModel(
     }
     
     /**
-     * Retry loading content
+     * Retry loading content — throttled to prevent rapid repeated calls
      */
     fun retryLoadContent() {
+        val currentTime = Clock.System.now().toEpochMilliseconds()
+        if (currentTime - lastRetryTime < retryDebounce) return
+        lastRetryTime = currentTime
         loadContent()
     }
     

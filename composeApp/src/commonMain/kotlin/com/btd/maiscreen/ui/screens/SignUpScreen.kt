@@ -97,7 +97,7 @@ fun SignUpScreen(
                      birthdate.isNotBlank() &&
                      email == confirmEmail &&
                      password == confirmPassword &&
-                     password.length >= 6 &&
+                     password.length >= 8 &&
                      isValidBirthdate(birthdate)
     
     val emailsMatch = email == confirmEmail || confirmEmail.isEmpty()
@@ -108,12 +108,16 @@ fun SignUpScreen(
     val black = Color(0xFF000000)
     val starWhite = Color(0xFFFFFFFF)
     
-    // Generate random stars
+    // Generate random stars — size and alpha are remembered here so they don't
+    // re-randomise on every Canvas draw, preventing visual flicker.
+    // Each entry: [x, y, size, alpha]
     val stars = remember {
         List(80) {
-            Offset(
-                x = Random.nextFloat(),
-                y = Random.nextFloat() * 0.4f // Stars only in the top 40% (black area)
+            floatArrayOf(
+                Random.nextFloat(),
+                Random.nextFloat() * 0.4f,
+                Random.nextFloat() * 3f + 1.5f,
+                Random.nextFloat() * 0.8f + 0.2f
             )
         }
     }
@@ -131,16 +135,12 @@ fun SignUpScreen(
             )
             drawRect(gradient)
             
-            // Draw stars
+            // Draw stars using pre-computed size/alpha to avoid per-frame randomisation
             stars.forEach { star ->
-                val starSize = Random.nextFloat() * 3f + 1.5f
                 drawCircle(
-                    color = starWhite.copy(alpha = Random.nextFloat() * 0.8f + 0.2f),
-                    radius = starSize,
-                    center = Offset(
-                        x = star.x * size.width,
-                        y = star.y * size.height
-                    )
+                    color = starWhite.copy(alpha = star[3]),
+                    radius = star[2],
+                    center = Offset(x = star[0] * size.width, y = star[1] * size.height)
                 )
             }
         }
@@ -347,9 +347,9 @@ fun SignUpScreen(
                 )
             )
             
-            if (password.isNotEmpty() && password.length < 6) {
+            if (password.isNotEmpty() && password.length < 8) {
                 Text(
-                    text = "Password must be at least 6 characters",
+                    text = "Password must be at least 8 characters",
                     color = Color.Red,
                     fontSize = 12.sp,
                     modifier = Modifier.fillMaxWidth()

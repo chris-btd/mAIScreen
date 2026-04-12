@@ -81,35 +81,56 @@ fun App() {
             }
             AppScreen.Login -> {
                 var isLoading by remember { mutableStateOf(false) }
-                
+                // Rate limiting: 3 failed attempts → 30-second lockout
+                var failedLoginAttempts by remember { mutableStateOf(0) }
+                var lockoutEndTime by remember { mutableStateOf(0L) }
+
                 LoginScreen(
                     onLoginClick = { email, password ->
+                        val now = System.currentTimeMillis()
+                        // Enforce lockout if too many failed attempts
+                        if (now < lockoutEndTime) {
+                            val secondsLeft = ((lockoutEndTime - now) / 1000).coerceAtLeast(1)
+                            appViewModel.showError("Too many failed attempts. Please wait ${secondsLeft}s before trying again.")
+                            return@LoginScreen
+                        }
+
                         println("🔑 Starting native Amplify sign-in for: $email")
                         appViewModel.clearError()
                         isLoading = true
-                        
+
                         // Check if already authenticated first
                         if (isAuthenticated) {
                             println("ℹ️ User already authenticated, skipping login")
                             isLoading = false
                             return@LoginScreen
                         }
-                        
+
                         AuthManager.signInWithAmplify(email, password) { success, error ->
-                            isLoading = false // Stop loading spinner
-                            
+                            isLoading = false
+
                             if (success) {
                                 println("✅ Native sign-in successful!")
+                                failedLoginAttempts = 0
+                                lockoutEndTime = 0L
                                 AppAuthState.setAuthenticated(true, email)
                             } else {
                                 println("❌ Native sign-in failed: $error")
                                 // Handle "already signed in" error gracefully
                                 if (error?.contains("already a user signed in") == true) {
                                     println("ℹ️ User was already signed in, updating state")
+                                    failedLoginAttempts = 0
+                                    lockoutEndTime = 0L
                                     AppAuthState.setAuthenticated(true, email)
                                 } else {
-                                    // Show error to user
-                                    appViewModel.showError(error ?: "Login failed. Please check your credentials and try again.")
+                                    failedLoginAttempts++
+                                    if (failedLoginAttempts >= 3) {
+                                        lockoutEndTime = System.currentTimeMillis() + 30_000L
+                                        failedLoginAttempts = 0
+                                        appViewModel.showError("Too many failed attempts. Please wait 30 seconds before trying again.")
+                                    } else {
+                                        appViewModel.showError(error ?: "Login failed. Please check your credentials and try again.")
+                                    }
                                 }
                             }
                         }
@@ -154,6 +175,9 @@ fun App() {
                 )
             }
             AppScreen.Confirmation -> {
+                // Throttle resend to once every 60 seconds
+                var lastResendTime by remember { mutableStateOf(0L) }
+
                 ConfirmationScreen(
                     email = pendingSignUpEmail,
                     onConfirmClick = { confirmationCode ->
@@ -170,6 +194,13 @@ fun App() {
                         }
                     },
                     onResendClick = {
+                        val now = System.currentTimeMillis()
+                        if (now - lastResendTime < 60_000L) {
+                            val secondsLeft = ((60_000L - (now - lastResendTime)) / 1000).coerceAtLeast(1)
+                            appViewModel.showError("Please wait ${secondsLeft}s before requesting another code.")
+                            return@ConfirmationScreen
+                        }
+                        lastResendTime = now
                         println("📧 Resending confirmation code")
                         appViewModel.clearError()
                         AuthManager.resendConfirmationCode(pendingSignUpEmail)

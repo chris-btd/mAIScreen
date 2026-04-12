@@ -43,6 +43,9 @@ class ContentRepositoryImpl(
     // Playback API for streaming
     private val playbackApi = PlaybackApiFactory.create(playbackConfig)
 
+    // Cached content map — built once since the data is static test content
+    private val contentMap: Map<String, ContentItem> by lazy { buildContentMap() }
+
     override suspend fun getFeaturedContent(): ContentResult<ContentItem> {
         return try {
             // Check if we should use test data or fetch from AWS
@@ -50,7 +53,6 @@ class ContentRepositoryImpl(
                 return getConfigDrivenFeaturedContent()
             } else {
                 return try {
-                    delay(500)
                     // TODO: Replace with actual AWS API call
                     getConfigDrivenFeaturedContent()
                 } catch (e: Exception) {
@@ -65,10 +67,10 @@ class ContentRepositoryImpl(
 
     private suspend fun getConfigDrivenFeaturedContent(): ContentResult<ContentItem> {
         return try {
-            delay(300)
+            if (AppSettings.useTestData) delay(300)
 
             val config = ContentConfigLoader.getConfig()
-            val allContent = buildContentMap()
+            val allContent = contentMap
 
             // Get hero content from config
             val heroContent = allContent[config.hero.contentId]
@@ -88,7 +90,6 @@ class ContentRepositoryImpl(
                 return getConfigDrivenCategories()
             } else {
                 return try {
-                    delay(500)
                     // TODO: Replace with actual AWS API call
                     getConfigDrivenCategories()
                 } catch (e: Exception) {
@@ -103,10 +104,10 @@ class ContentRepositoryImpl(
 
     private suspend fun getConfigDrivenCategories(): ContentResult<List<ContentCategory>> {
         return try {
-            delay(300)
+            if (AppSettings.useTestData) delay(300)
 
             val config = ContentConfigLoader.getConfig()
-            val allContent = buildContentMap()
+            val allContent = contentMap
 
             // CRITICAL: Only include test categories when useTestData is true
             val activeCategories = if (AppSettings.useTestData) {
@@ -429,8 +430,6 @@ class ContentRepositoryImpl(
 
     override suspend fun toggleLike(contentId: String): ContentResult<ContentItem> {
         return try {
-            delay(100)
-
             val content = contentStorage[contentId]
                 ?: return ApiResponseError("Content not found")
 
@@ -445,8 +444,6 @@ class ContentRepositoryImpl(
 
     override suspend fun toggleWatchlist(contentId: String): ContentResult<ContentItem> {
         return try {
-            delay(100)
-
             val content = contentStorage[contentId]
                 ?: return ApiResponseError("Content not found")
 
