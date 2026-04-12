@@ -1,29 +1,7 @@
 import React, { useState } from 'react';
 import './MainScreen.css';
-
-interface ContentItem {
-  id: string;
-  title: string;
-  description: string;
-  synopsis: string;
-  thumbnailColor: string;
-  category: string;
-  duration: string;
-  rating: string;
-  year: string;
-  ageRating: string;
-  genres: string[];
-  cast: string[];
-  director: string;
-  videoUrl?: string;
-  isLiked: boolean;
-  isInWatchlist: boolean;
-}
-
-interface ContentCategory {
-  name: string;
-  items: ContentItem[];
-}
+import { ContentItem, ContentCategory, CategoryType } from '../../types/ContentConfig';
+import { useContentConfig } from '../../hooks/useContentConfig';
 
 interface MainScreenProps {
   onProfileClick?: () => void;
@@ -42,216 +20,19 @@ export const MainScreen: React.FC<MainScreenProps> = ({
   onToggleLike = () => {},
   onToggleWatchlist = () => {}
 }) => {
-  // Note: onContentClick is used via handleShowDetails function below
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [playingContent, setPlayingContent] = useState<ContentItem | null>(null);
 
-  // Sample content data
-  const featuredContent: ContentItem = {
-    id: "featured1",
-    title: "AI Dreams: The Future Unfolds",
-    description: "An immersive journey through AI-generated worlds where reality and imagination blur into stunning visual narratives. Experience the cutting-edge of artificial creativity.",
-    synopsis: "In a world where artificial intelligence has evolved beyond human comprehension, a young data scientist discovers a hidden realm within the neural networks. As she navigates through layers of digital consciousness, she uncovers a conspiracy that threatens both the virtual and real worlds. With stunning AI-generated visuals and a gripping narrative, this film explores the boundaries between human creativity and machine intelligence, questioning what it truly means to dream in an age of artificial minds.",
-    thumbnailColor: "#6366F1",
-    category: "Featured",
-    duration: "2h 15m",
-    rating: "★ 4.8",
-    year: "2024",
-    ageRating: "PG-13",
-    genres: ["Sci-Fi", "Drama", "Thriller"],
-    cast: ["Sarah Chen", "Marcus Rivera", "Dr. Elena Vasquez"],
-    director: "AI Director Alpha",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    isLiked: false,
-    isInWatchlist: false
-  };
+  // Test data toggle - can be stored in localStorage
+  const [useTestData, setUseTestData] = useState(() => {
+    const stored = localStorage.getItem('useTestData');
+    return stored === 'true';
+  });
 
-  const contentCategories: ContentCategory[] = [
-    {
-      name: "Trending Now",
-      items: [
-        {
-          id: "1",
-          title: "Neural Networks",
-          description: "AI explores consciousness",
-          synopsis: "A groundbreaking series that delves into the mysteries of artificial consciousness. Follow Dr. Maya Singh as she develops the first truly sentient AI, only to discover that her creation has its own agenda.",
-          thumbnailColor: "#EF4444",
-          category: "Sci-Fi",
-          duration: "1h 45m",
-          rating: "★ 4.7",
-          year: "2024",
-          ageRating: "TV-14",
-          genres: ["Sci-Fi", "Drama"],
-          cast: ["Dr. Maya Singh", "ARIA (AI)", "Prof. Chen"],
-          director: "AI Director Beta",
-          videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-          isLiked: false,
-          isInWatchlist: false
-        },
-        {
-          id: "2",
-          title: "Digital Horizons",
-          description: "Virtual reality adventures",
-          synopsis: "Step into breathtaking virtual worlds where anything is possible. This anthology series showcases the most stunning AI-generated environments and the stories that unfold within them.",
-          thumbnailColor: "#10B981",
-          category: "Adventure",
-          duration: "2h 10m",
-          rating: "★ 4.6",
-          year: "2024",
-          ageRating: "PG-13",
-          genres: ["Adventure", "Fantasy", "Anthology"],
-          cast: ["Various"],
-          director: "Collective AI Studios",
-          videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-          isLiked: false,
-          isInWatchlist: false
-        },
-        {
-          id: "3",
-          title: "Code & Canvas",
-          description: "Art meets technology",
-          synopsis: "A documentary exploring how AI is revolutionizing the art world. From music composition to visual masterpieces, witness the birth of a new creative renaissance.",
-          thumbnailColor: "#F59E0B",
-          category: "Documentary",
-          duration: "1h 30m",
-          rating: "★ 4.9",
-          year: "2024",
-          ageRating: "G",
-          genres: ["Documentary", "Art"],
-          cast: ["Various Artists", "Tech Innovators"],
-          director: "Human Director",
-          isLiked: false,
-          isInWatchlist: false
-        },
-        {
-          id: "4",
-          title: "Quantum Tales",
-          description: "Stories from the future",
-          synopsis: "Set in 2045, this drama series follows interconnected lives in a world where quantum computing has solved humanity's greatest challenges, but created entirely new ones.",
-          thumbnailColor: "#8B5CF6",
-          category: "Drama",
-          duration: "1h 55m",
-          rating: "★ 4.5",
-          year: "2024",
-          ageRating: "TV-MA",
-          genres: ["Drama", "Sci-Fi", "Thriller"],
-          cast: ["Alex Chen", "Dr. Quantum", "Zara Kim"],
-          director: "AI Director Gamma",
-          isLiked: false,
-          isInWatchlist: false
-        },
-        {
-          id: "5",
-          title: "Synthetic Souls",
-          description: "AI-generated emotions",
-          synopsis: "A beautiful love story between a human and an AI entity. This film questions the nature of love, consciousness, and what it means to be truly alive in the digital age.",
-          thumbnailColor: "#EC4899",
-          category: "Romance",
-          duration: "2h 5m",
-          rating: "★ 4.8",
-          year: "2024",
-          ageRating: "PG-13",
-          genres: ["Romance", "Sci-Fi", "Drama"],
-          cast: ["Emma Torres", "ADAM (AI)", "Dr. Love"],
-          director: "AI Director Delta",
-          isLiked: false,
-          isInWatchlist: false
-        }
-      ]
-    },
-    {
-      name: "AI Originals",
-      items: [
-        {
-          id: "6",
-          title: "Machine Learning",
-          description: "Educational series",
-          synopsis: "Learn the fundamentals of AI and machine learning through engaging storytelling and stunning visualizations. Perfect for curious minds wanting to understand the technology shaping our future.",
-          thumbnailColor: "#06B6D4",
-          category: "Education",
-          duration: "45m",
-          rating: "★ 4.4",
-          year: "2024",
-          ageRating: "G",
-          genres: ["Education", "Technology"],
-          cast: ["Prof. DataBot", "Students"],
-          director: "Educational AI",
-          isLiked: false,
-          isInWatchlist: false
-        },
-        {
-          id: "7",
-          title: "Binary Dreams",
-          description: "Short film collection",
-          synopsis: "A collection of thought-provoking short films exploring the intersection of humanity and technology. Each episode presents a unique perspective on our digital future.",
-          thumbnailColor: "#F97316",
-          category: "Anthology",
-          duration: "1h 20m",
-          rating: "★ 4.7",
-          year: "2024",
-          ageRating: "TV-14",
-          genres: ["Anthology", "Drama", "Sci-Fi"],
-          cast: ["Various"],
-          director: "Indie AI Collective",
-          isLiked: false,
-          isInWatchlist: false
-        },
-        {
-          id: "8",
-          title: "Algorithm Stories",
-          description: "Tech narratives",
-          synopsis: "Behind-the-scenes stories of the algorithms that run our world. From social media feeds to autonomous vehicles, discover the code that shapes human behavior.",
-          thumbnailColor: "#84CC16",
-          category: "Tech",
-          duration: "1h 35m",
-          rating: "★ 4.6",
-          year: "2024",
-          ageRating: "TV-PG",
-          genres: ["Technology", "Documentary"],
-          cast: ["Tech Experts", "Engineers"],
-          director: "Tech Documentary AI",
-          isLiked: false,
-          isInWatchlist: false
-        },
-        {
-          id: "9",
-          title: "Data Streams",
-          description: "Information age tales",
-          synopsis: "A cyber-thriller following a team of data analysts who uncover a massive conspiracy hidden in the world's information networks. Trust no one, question everything.",
-          thumbnailColor: "#3B82F6",
-          category: "Thriller",
-          duration: "2h 0m",
-          rating: "★ 4.8",
-          year: "2024",
-          ageRating: "R",
-          genres: ["Thriller", "Cyber", "Mystery"],
-          cast: ["Agent Data", "Hacker Zero", "CEO Corp"],
-          director: "AI Thriller Master",
-          isLiked: false,
-          isInWatchlist: false
-        },
-        {
-          id: "10",
-          title: "Virtual Visions",
-          description: "Immersive experiences",
-          synopsis: "Experience the future of entertainment with these VR-optimized films. Designed specifically for virtual reality, these stories put you at the center of the action.",
-          thumbnailColor: "#8B5CF6",
-          category: "VR",
-          duration: "1h 15m",
-          rating: "★ 4.5",
-          year: "2024",
-          ageRating: "PG-13",
-          genres: ["VR", "Interactive", "Adventure"],
-          cast: ["You (Viewer)", "Guide AI"],
-          director: "VR AI Director",
-          isLiked: false,
-          isInWatchlist: false
-        }
-      ]
-    }
-  ];
+  // Use config-driven content
+  const { categories, heroContent, isLoading } = useContentConfig({ useTestData });
 
   const handleShowDetails = (content: ContentItem) => {
     setSelectedContent(content);
@@ -278,6 +59,21 @@ export const MainScreen: React.FC<MainScreenProps> = ({
     setPlayingContent(null);
   };
 
+  const toggleTestData = () => {
+    const newValue = !useTestData;
+    setUseTestData(newValue);
+    localStorage.setItem('useTestData', String(newValue));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="main-screen loading">
+        <div className="loading-spinner"></div>
+        <p>Loading content...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="main-screen">
       <div className="starry-background">
@@ -299,59 +95,61 @@ export const MainScreen: React.FC<MainScreenProps> = ({
         <nav className="top-nav">
           <h1 className="logo">mAIScreen</h1>
           <div className="nav-actions">
+            <button
+              className={`nav-button test-toggle ${useTestData ? 'active' : ''}`}
+              onClick={toggleTestData}
+              title={useTestData ? 'Test Data: ON' : 'Test Data: OFF'}
+            >
+              {useTestData ? '...' : '...'}
+            </button>
             <button className="nav-button" onClick={onSearchClick}>
-              🔍
+              ...
             </button>
             <button className="nav-button" onClick={onProfileClick}>
-              👤
+              ...
             </button>
           </div>
         </nav>
 
         {/* Featured Content Hero */}
-        <div className="hero-section">
-          <div 
-            className="hero-content"
-            style={{ backgroundColor: featuredContent.thumbnailColor }}
-          >
-            <div className="hero-overlay">
-              <div className="hero-info">
-                <h2 className="hero-title">{featuredContent.title}</h2>
-                <p className="hero-description">{featuredContent.description}</p>
-                <div className="hero-meta">
-                  <span>{featuredContent.rating}</span>
-                  <span>{featuredContent.duration}</span>
-                  <span>{featuredContent.category}</span>
+        {heroContent && (
+          <div className="hero-section">
+            <div
+              className="hero-content"
+              style={{ backgroundColor: heroContent.thumbnailColor }}
+            >
+              <div className="hero-overlay">
+                <div className="hero-info">
+                  <h2 className="hero-title">{heroContent.title}</h2>
+                  <p className="hero-description">{heroContent.description}</p>
+                  <div className="hero-meta">
+                    <span>{heroContent.rating}</span>
+                    <span>{heroContent.duration}</span>
+                    <span>{heroContent.category}</span>
+                  </div>
+                  <button
+                    className="play-button"
+                    onClick={() => handlePlayContent(heroContent)}
+                  >
+                    ... Play
+                  </button>
                 </div>
-                <button
-                  className="play-button"
-                  onClick={() => handlePlayContent(featuredContent)}
-                >
-                  ▶️ Play
-                </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Content Categories */}
         <div className="categories-section">
-          {contentCategories.map((category) => (
-            <div key={category.name} className="category">
-              <h3 className="category-title">{category.name}</h3>
-              <div className="content-row">
-                {category.items.map((item) => (
-                  <ContentCard
-                    key={item.id}
-                    content={item}
-                    onShowDetails={() => handleShowDetails(item)}
-                    onPlay={() => handlePlayContent(item)}
-                    onToggleLike={() => onToggleLike(item)}
-                    onToggleWatchlist={() => onToggleWatchlist(item)}
-                  />
-                ))}
-              </div>
-            </div>
+          {categories.map((category) => (
+            <CategorySection
+              key={category.id}
+              category={category}
+              onShowDetails={handleShowDetails}
+              onPlay={handlePlayContent}
+              onToggleLike={onToggleLike}
+              onToggleWatchlist={onToggleWatchlist}
+            />
           ))}
         </div>
       </div>
@@ -380,6 +178,158 @@ export const MainScreen: React.FC<MainScreenProps> = ({
   );
 };
 
+// Category Section Component - handles different category types
+interface CategorySectionProps {
+  category: ContentCategory;
+  onShowDetails: (content: ContentItem) => void;
+  onPlay: (content: ContentItem) => void;
+  onToggleLike: (content: ContentItem) => void;
+  onToggleWatchlist: (content: ContentItem) => void;
+}
+
+const CategorySection: React.FC<CategorySectionProps> = ({
+  category,
+  onShowDetails,
+  onPlay,
+  onToggleLike,
+  onToggleWatchlist
+}) => {
+  return (
+    <div className={`category ${category.type}`}>
+      {/* Category Header */}
+      {category.type === 'themed' ? (
+        <ThemedCategoryHeader
+          name={category.name}
+          themeIcon={category.themeIcon}
+          themeColor={category.themeColor}
+        />
+      ) : (
+        <h3 className="category-title">{category.name}</h3>
+      )}
+
+      {/* Content Row */}
+      <div className={`content-row ${category.type === 'top10' ? 'top10-row' : ''}`}>
+        {category.items.map((item, index) => (
+          category.type === 'top10' ? (
+            <Top10Card
+              key={item.id}
+              content={item}
+              rank={index + 1}
+              onShowDetails={() => onShowDetails(item)}
+              onPlay={() => onPlay(item)}
+              onToggleLike={() => onToggleLike(item)}
+              onToggleWatchlist={() => onToggleWatchlist(item)}
+            />
+          ) : (
+            <ContentCard
+              key={item.id}
+              content={item}
+              onShowDetails={() => onShowDetails(item)}
+              onPlay={() => onPlay(item)}
+              onToggleLike={() => onToggleLike(item)}
+              onToggleWatchlist={() => onToggleWatchlist(item)}
+            />
+          )
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Themed Category Header Component
+interface ThemedCategoryHeaderProps {
+  name: string;
+  themeIcon?: string;
+  themeColor?: string;
+}
+
+const ThemedCategoryHeader: React.FC<ThemedCategoryHeaderProps> = ({
+  name,
+  themeIcon,
+  themeColor
+}) => {
+  return (
+    <div className="themed-category-header">
+      {themeIcon && <span className="theme-icon">{themeIcon}</span>}
+      <h3 className="category-title" style={{ color: themeColor }}>{name}</h3>
+      {themeColor && <div className="theme-indicator" style={{ backgroundColor: themeColor }} />}
+    </div>
+  );
+};
+
+// Top 10 Card Component with rank badge
+interface Top10CardProps {
+  content: ContentItem;
+  rank: number;
+  onShowDetails: () => void;
+  onPlay: () => void;
+  onToggleLike: () => void;
+  onToggleWatchlist: () => void;
+}
+
+const Top10Card: React.FC<Top10CardProps> = ({
+  content,
+  rank,
+  onShowDetails,
+  onPlay,
+  onToggleLike,
+  onToggleWatchlist
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <div className="top10-card-container">
+      <div className="rank-number">{rank}</div>
+      <div
+        className={`content-card top10 ${isHovered ? 'hovered' : ''}`}
+        style={{ backgroundColor: content.thumbnailColor }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={onShowDetails}
+      >
+        <div className="card-overlay">
+          {isHovered ? (
+            <div className="hover-actions">
+              <button className="action-button play-btn" onClick={(e) => {
+                e.stopPropagation();
+                onPlay();
+              }}>
+                ...
+              </button>
+              <div className="secondary-actions">
+                <button className="action-button" onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleLike();
+                }}>
+                  {content.isLiked ? '...' : '...'}
+                </button>
+                <button className="action-button" onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleWatchlist();
+                }}>
+                  {content.isInWatchlist ? '...' : '+'}
+                </button>
+                <button className="action-button" onClick={(e) => {
+                  e.stopPropagation();
+                  onShowDetails();
+                }}>
+                  i
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="card-info">
+              <h4 className="card-title">{content.title}</h4>
+              <p className="card-rating">{content.rating}</p>
+              <p className="card-duration">{content.duration}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Content Card Component with Netflix-style hover effects
 interface ContentCardProps {
   content: ContentItem;
@@ -399,7 +349,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div 
+    <div
       className={`content-card ${isHovered ? 'hovered' : ''}`}
       style={{ backgroundColor: content.thumbnailColor }}
       onMouseEnter={() => setIsHovered(true)}
@@ -413,20 +363,20 @@ const ContentCard: React.FC<ContentCardProps> = ({
               e.stopPropagation();
               onPlay();
             }}>
-              ▶️
+              ...
             </button>
             <div className="secondary-actions">
               <button className="action-button" onClick={(e) => {
                 e.stopPropagation();
                 onToggleLike();
               }}>
-                {content.isLiked ? '❤️' : '🤍'}
+                {content.isLiked ? '...' : '...'}
               </button>
               <button className="action-button" onClick={(e) => {
                 e.stopPropagation();
                 onToggleWatchlist();
               }}>
-                {content.isInWatchlist ? '✓' : '+'}
+                {content.isInWatchlist ? '...' : '+'}
               </button>
               <button className="action-button" onClick={(e) => {
                 e.stopPropagation();
@@ -468,26 +418,26 @@ const ContentDetailsModal: React.FC<ContentDetailsModalProps> = ({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button className="close-button" onClick={onClose}>
-          ×
+          x
         </button>
-        
-        <div 
+
+        <div
           className="modal-hero"
           style={{ backgroundColor: content.thumbnailColor }}
         >
           <div className="modal-hero-overlay">
-            <button 
+            <button
               className="modal-play-button"
               onClick={() => onPlay(content)}
             >
-              ▶️
+              ...
             </button>
           </div>
         </div>
 
         <div className="modal-details">
           <h2 className="modal-title">{content.title} ({content.year})</h2>
-          
+
           <div className="modal-meta">
             <span className="rating">{content.rating}</span>
             <span className="duration">{content.duration}</span>
@@ -495,23 +445,23 @@ const ContentDetailsModal: React.FC<ContentDetailsModalProps> = ({
           </div>
 
           <div className="modal-actions">
-            <button 
+            <button
               className="modal-action-button primary"
               onClick={() => onPlay(content)}
             >
-              ▶️ Play
+              ... Play
             </button>
-            <button 
+            <button
               className="modal-action-button secondary"
               onClick={() => onToggleLike(content)}
             >
-              {content.isLiked ? '❤️' : '🤍'} {content.isLiked ? 'Liked' : 'Like'}
+              {content.isLiked ? '...' : '...'} {content.isLiked ? 'Liked' : 'Like'}
             </button>
-            <button 
+            <button
               className="modal-action-button secondary"
               onClick={() => onToggleWatchlist(content)}
             >
-              {content.isInWatchlist ? '✓' : '+'} {content.isInWatchlist ? 'In List' : 'My List'}
+              {content.isInWatchlist ? '...' : '+'} {content.isInWatchlist ? 'In List' : 'My List'}
             </button>
           </div>
 
@@ -564,7 +514,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
       <div className="video-player-container">
         {/* Close Button */}
         <button className="video-close-button" onClick={onClose}>
-          ✕
+          x
         </button>
 
         {/* Loading State */}
@@ -578,7 +528,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ content, onClose }) => {
         {/* Error State */}
         {hasError && (
           <div className="video-error">
-            <div className="error-icon">⚠️</div>
+            <div className="error-icon">...</div>
             <h3>Playback Error</h3>
             <p>Unable to load the video. Please try again.</p>
             <button onClick={onClose} className="error-button">Go Back</button>

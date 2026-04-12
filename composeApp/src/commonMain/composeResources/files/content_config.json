@@ -1,0 +1,77 @@
+{
+  "version": "1.0",
+  "hero": {
+    "contentId": "featured1",
+    "fallbackContentId": "1"
+  },
+  "categories": [
+    {
+      "id": "top10",
+      "name": "Top 10 Trending",
+      "type": "top10",
+      "order": 1,
+      "enabled": true,
+      "isTestOnly": false,
+      "contentIds": ["1", "2", "3", "4", "5", "6", "7", "comic1", "comic2", "comic3"],
+      "maxItems": 10
+    },
+    {
+      "id": "bhm",
+      "name": "Black History Month",
+      "type": "themed",
+      "order": 2,
+      "enabled": true,
+      "isTestOnly": false,
+      "contentIds": ["5", "6", "7"],
+      "themeColor": "#FFC107",
+      "themeIcon": "..."
+    },
+    {
+      "id": "trending",
+      "name": "Trending Now",
+      "type": "standard",
+      "order": 3,
+      "enabled": true,
+      "isTestOnly": false,
+      "contentIds": ["1", "2", "3", "4"]
+    },
+    {
+      "id": "ai_originals",
+      "name": "AI Originals",
+      "type": "standard",
+      "order": 4,
+      "enabled": true,
+      "isTestOnly": false,
+      "contentIds": ["5", "6"]
+    },
+    {
+      "id": "popular",
+      "name": "Popular This Week",
+      "type": "standard",
+      "order": 5,
+      "enabled": true,
+      "isTestOnly": false,
+      "contentIds": ["7"]
+    },
+    {
+      "id": "comics",
+      "name": "Comic Books",
+      "type": "standard",
+      "order": 6,
+      "enabled": true,
+      "isTestOnly": false,
+      "contentIds": ["comic1", "comic2", "comic3", "comic4"]
+    }
+  ],
+  "testCategories": [
+    {
+      "id": "test",
+      "name": "Test",
+      "type": "standard",
+      "order": 0,
+      "enabled": true,
+      "isTestOnly": true,
+      "contentIds": ["TEST001"]
+    }
+  ]
+}

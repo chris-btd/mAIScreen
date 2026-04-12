@@ -20,4 +20,7 @@ actual object AppConfig {
     actual val cognitoRedirectUri: String = System.getProperty("cognito.redirect.uri") ?: "https://d84l1y8p4kdic.cloudfront.net"
     actual val cognitoLogoutUri: String = System.getProperty("cognito.logout.uri") ?: "https://d84l1y8p4kdic.cloudfront.net/logout"
     actual val cognitoScope: String = System.getProperty("cognito.scope") ?: "email openid phone"
+
+    // Build-time test mode flag (for JVM/Desktop, enable test mode by default)
+    actual val isTestMode: Boolean = System.getProperty("test.mode")?.toBoolean() ?: true
 }

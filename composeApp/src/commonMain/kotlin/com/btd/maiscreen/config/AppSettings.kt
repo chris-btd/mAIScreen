@@ -10,27 +10,37 @@ import androidx.compose.runtime.setValue
 object AppSettings {
     var isLocalPlaybackEnabled by mutableStateOf(false)
         private set
-    
-    // Dev-only setting: Use test data instead of AWS
-    // Default to true (test data) for dev builds
-    var useTestData by mutableStateOf(true)
-        private set
-    
+
+    /**
+     * SECURE: Test mode is now controlled by build configuration, not runtime
+     * This prevents users from accessing test content in production builds
+     */
+    val useTestData: Boolean
+        get() = AppConfig.isTestMode
+
     fun togglePlaybackMode() {
         isLocalPlaybackEnabled = !isLocalPlaybackEnabled
         val mode = if (isLocalPlaybackEnabled) "📱 Local Videos" else "☁️ AWS Streaming"
         println("🎬 Playback mode changed to: $mode")
     }
-    
+
     fun setPlaybackMode(isLocal: Boolean) {
         isLocalPlaybackEnabled = isLocal
         val mode = if (isLocalPlaybackEnabled) "📱 Local Videos" else "☁️ AWS Streaming"
         println("🎬 Playback mode set to: $mode")
     }
-    
+
+    /**
+     * DEPRECATED: Test mode is now controlled by build configuration
+     * This function is kept for compatibility but has no effect
+     */
+    @Deprecated(
+        "Test mode is now controlled by build configuration and cannot be changed at runtime",
+        ReplaceWith("AppConfig.isTestMode"),
+        DeprecationLevel.WARNING
+    )
     fun toggleTestData() {
-        useTestData = !useTestData
-        val source = if (useTestData) "🧪 Test Data" else "☁️ AWS"
-        println("📊 Content data source toggled to: $source")
+        println("⚠️ toggleTestData() is deprecated - test mode is now controlled by build configuration")
+        println("📊 Current test mode: ${if (useTestData) "🧪 Test Data" else "☁️ AWS"} (build-time)")
     }
 }
