@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Disable cleartext (HTTP) traffic in production -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust preinstalled CAs -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Debug configuration (allows localhost for development) -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+
+    <!-- Domain-specific configurations -->
+    <domain-config>
+        <!-- CloudFront domain - enforce HTTPS -->
+        <domain includeSubdomains="true">cloudfront.net</domain>
+        <!-- TODO: Add <pin-set> with actual SHA-256 pins before production.
+             To obtain pins, run:
+             openssl s_client -connect your-domain.cloudfront.net:443 | \
+               openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | \
+               openssl dgst -sha256 -binary | openssl enc -base64
+        -->
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <domain-config>
+        <!-- AWS Cognito domain - enforce HTTPS -->
+        <domain includeSubdomains="true">amazonaws.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

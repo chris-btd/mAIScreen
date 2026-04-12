@@ -1,0 +1,16 @@
+# local.properties.template
+# Copy this file to local.properties and fill in your actual values
+# DO NOT commit local.properties to version control!
+
+# CloudFront Configuration
+CLOUDFRONT_DOMAIN=your-cloudfront-domain.cloudfront.net
+
+# Test Credentials (for development only)
+TEST_EMAIL=your-test-email@example.com
+TEST_PASSWORD=your-secure-test-password
+
+# AWS Cognito Configuration
+COGNITO_ISSUER_URI=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX
+COGNITO_CLIENT_ID=your-cognito-client-id-here
+
+# For production builds, set these as environment variables in your CI/CD pipeline instead

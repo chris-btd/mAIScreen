@@ -2,11 +2,11 @@ package com.btd.maiscreen.auth
 
 import android.content.Intent
 import android.net.Uri
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import com.btd.maiscreen.config.AppConfig
+import com.btd.maiscreen.util.SecureLogger
 import net.openid.appauth.*
 import net.openid.appauth.browser.BrowserAllowList
 import net.openid.appauth.browser.VersionedBrowserMatcher
@@ -65,26 +65,24 @@ class CognitoAuthService(
                 .setBrowserMatcher(browserMatcher)
                 .build()
         )
-        
-        Log.d(TAG, "✅ AuthService initialized")
+
+        SecureLogger.d(TAG, "AuthService initialized")
     }
 
     private fun fetchCognitoConfiguration() {
-        Log.d(TAG, "🔄 Fetching Cognito configuration from: ${AppConfig.cognitoIssuerUri}")
-        
+        SecureLogger.d(TAG, "Fetching Cognito configuration")
+
         AuthorizationServiceConfiguration.fetchFromIssuer(
             Uri.parse(AppConfig.cognitoIssuerUri)
         ) { config, ex ->
             if (ex != null) {
-                Log.e(TAG, "❌ Failed to fetch Cognito service config", ex)
+                SecureLogger.e(TAG, "Failed to fetch Cognito service config", ex)
                 onAuthError?.invoke(ex)
                 return@fetchFromIssuer
             }
-            
+
             cognitoServiceConfig = config
-            Log.d(TAG, "✅ Cognito service configuration retrieved")
-            Log.d(TAG, "Authorization endpoint: ${config?.authorizationEndpoint}")
-            Log.d(TAG, "Token endpoint: ${config?.tokenEndpoint}")
+            SecureLogger.d(TAG, "Cognito service configuration retrieved")
         }
     }
 
@@ -94,13 +92,13 @@ class CognitoAuthService(
     fun startAuthorization() {
         val config = cognitoServiceConfig
         if (config == null) {
-            Log.e(TAG, "❌ Cognito configuration not available")
+            SecureLogger.e(TAG, "Cognito configuration not available")
             onAuthError?.invoke(AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW)
             return
         }
 
-        Log.d(TAG, "🚀 Starting authorization flow")
-        
+        SecureLogger.d(TAG, "Starting authorization flow")
+
         val authRequest = AuthorizationRequest.Builder(
             config,
             AppConfig.cognitoClientId,
@@ -110,23 +108,18 @@ class CognitoAuthService(
             .setScope(AppConfig.cognitoScope)
             .build()
 
-        Log.d(TAG, "📋 Auth request details:")
-        Log.d(TAG, "  Client ID: ${authRequest.clientId}")
-        Log.d(TAG, "  Redirect URI: ${authRequest.redirectUri}")
-        Log.d(TAG, "  Scope: ${authRequest.scope}")
-
         val authIntent = authService?.getAuthorizationRequestIntent(authRequest)
         if (authIntent != null) {
             authLauncher.launch(authIntent)
         } else {
-            Log.e(TAG, "❌ Failed to create auth intent")
+            SecureLogger.e(TAG, "Failed to create auth intent")
             onAuthError?.invoke(AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW)
         }
     }
 
     private fun handleAuthorizationResult(data: Intent?) {
         if (data == null) {
-            Log.e(TAG, "❌ No data received from authorization")
+            SecureLogger.e(TAG, "No data received from authorization")
             onAuthError?.invoke(AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW)
             return
         }
@@ -135,43 +128,41 @@ class CognitoAuthService(
         val ex = AuthorizationException.fromIntent(data)
 
         if (ex != null) {
-            Log.e(TAG, "❌ Authorization failed", ex)
+            SecureLogger.e(TAG, "Authorization failed", ex)
             onAuthError?.invoke(ex)
             return
         }
 
         if (response != null) {
-            Log.d(TAG, "✅ Authorization successful, exchanging code for tokens")
-            
+            SecureLogger.d(TAG, "Authorization successful, exchanging code for tokens")
+
             // Update auth state
             authState = net.openid.appauth.AuthState(response, ex)
-            
+
             // Exchange authorization code for tokens
             authService?.performTokenRequest(
                 response.createTokenExchangeRequest()
             ) { tokenResponse, tokenEx ->
                 if (tokenEx != null) {
-                    Log.e(TAG, "❌ Token exchange failed", tokenEx)
+                    SecureLogger.e(TAG, "Token exchange failed", tokenEx)
                     onAuthError?.invoke(tokenEx)
                     return@performTokenRequest
                 }
 
                 if (tokenResponse != null) {
-                    Log.d(TAG, "✅ Token exchange successful")
-                    Log.d(TAG, "Access token: ${tokenResponse.accessToken?.substring(0, 20)}...")
-                    Log.d(TAG, "ID token: ${tokenResponse.idToken?.substring(0, 20)}...")
-                    
+                    SecureLogger.d(TAG, "Token exchange successful")
+
                     // Update auth state with tokens
                     authState?.update(tokenResponse, tokenEx)
-                    
+
                     onAuthSuccess?.invoke(tokenResponse)
                 } else {
-                    Log.e(TAG, "❌ No token response received")
+                    SecureLogger.e(TAG, "No token response received")
                     onAuthError?.invoke(AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW)
                 }
             }
         } else {
-            Log.e(TAG, "❌ No authorization response received")
+            SecureLogger.e(TAG, "No authorization response received")
             onAuthError?.invoke(AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW)
         }
     }
@@ -182,9 +173,9 @@ class CognitoAuthService(
     fun logout() {
         val config = cognitoServiceConfig
         val currentAuthState = authState
-        
+
         if (config == null || currentAuthState == null) {
-            Log.w(TAG, "⚠️ No config or auth state available for logout, clearing local state")
+            SecureLogger.w(TAG, "No config or auth state available for logout, clearing local state")
             clearAuthState()
             onLogoutComplete?.invoke()
             return
@@ -193,13 +184,13 @@ class CognitoAuthService(
         // Get ID token from the auth state
         val idToken = currentAuthState.idToken
         if (idToken == null) {
-            Log.w(TAG, "⚠️ No ID token available for logout, clearing local state")
+            SecureLogger.w(TAG, "No ID token available for logout, clearing local state")
             clearAuthState()
             onLogoutComplete?.invoke()
             return
         }
 
-        Log.d(TAG, "🚪 Starting logout flow")
+        SecureLogger.d(TAG, "Starting logout flow")
 
         val endSessionRequest = EndSessionRequest.Builder(config)
             .setIdTokenHint(idToken)
@@ -214,7 +205,7 @@ class CognitoAuthService(
         if (endSessionIntent != null) {
             logoutLauncher.launch(endSessionIntent)
         } else {
-            Log.e(TAG, "❌ Failed to create logout intent")
+            SecureLogger.e(TAG, "Failed to create logout intent")
             clearAuthState()
             onLogoutComplete?.invoke()
         }
@@ -225,9 +216,9 @@ class CognitoAuthService(
         val ex = AuthorizationException.fromIntent(data)
 
         if (ex != null) {
-            Log.e(TAG, "❌ Logout failed", ex)
+            SecureLogger.e(TAG, "Logout failed", ex)
         } else {
-            Log.d(TAG, "✅ Logout successful")
+            SecureLogger.d(TAG, "Logout successful")
         }
 
         clearAuthState()
@@ -236,7 +227,7 @@ class CognitoAuthService(
 
     private fun clearAuthState() {
         authState = null
-        Log.d(TAG, "🧹 Auth state cleared")
+        SecureLogger.d(TAG, "Auth state cleared")
     }
 
     /**
@@ -266,6 +257,6 @@ class CognitoAuthService(
     fun dispose() {
         authService?.dispose()
         authService = null
-        Log.d(TAG, "🧹 CognitoAuthService disposed")
+        SecureLogger.d(TAG, "CognitoAuthService disposed")
     }
 }
