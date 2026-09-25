@@ -88,17 +88,17 @@ fun SignUpScreen(
     }
     
     // Form validation
-    val isFormValid = firstName.isNotBlank() && 
-                     lastName.isNotBlank() && 
-                     email.isNotBlank() && 
-                     confirmEmail.isNotBlank() && 
-                     password.isNotBlank() && 
+    // First/last name and birthdate are optional — collected for personalization
+    // if provided, but not required to create an account. If a birthdate is
+    // entered, it still has to be a valid date.
+    val isFormValid = email.isNotBlank() &&
+                     confirmEmail.isNotBlank() &&
+                     password.isNotBlank() &&
                      confirmPassword.isNotBlank() &&
-                     birthdate.isNotBlank() &&
                      email == confirmEmail &&
                      password == confirmPassword &&
                      password.length >= 6 &&
-                     isValidBirthdate(birthdate)
+                     (birthdate.isBlank() || isValidBirthdate(birthdate))
     
     val emailsMatch = email == confirmEmail || confirmEmail.isEmpty()
     val passwordsMatch = password == confirmPassword || confirmPassword.isEmpty()
@@ -195,7 +195,7 @@ fun SignUpScreen(
             OutlinedTextField(
                 value = firstName,
                 onValueChange = { firstName = it },
-                label = { Text("First Name", color = Color.White.copy(alpha = 0.7f)) },
+                label = { Text("First Name (optional)", color = Color.White.copy(alpha = 0.7f)) },
                 placeholder = { Text("Enter your first name", color = Color.White.copy(alpha = 0.5f)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -213,7 +213,7 @@ fun SignUpScreen(
             OutlinedTextField(
                 value = lastName,
                 onValueChange = { lastName = it },
-                label = { Text("Last Name", color = Color.White.copy(alpha = 0.7f)) },
+                label = { Text("Last Name (optional)", color = Color.White.copy(alpha = 0.7f)) },
                 placeholder = { Text("Enter your last name", color = Color.White.copy(alpha = 0.5f)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -291,7 +291,7 @@ fun SignUpScreen(
                         }
                     }
                 },
-                label = { Text("Birthdate", color = Color.White.copy(alpha = 0.7f)) },
+                label = { Text("Birthdate (optional)", color = Color.White.copy(alpha = 0.7f)) },
                 placeholder = { Text("MM/DD/YYYY", color = Color.White.copy(alpha = 0.5f)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -313,6 +313,13 @@ fun SignUpScreen(
                 Text(
                     text = "Please enter a valid date in MM/DD/YYYY format",
                     color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else if (birthdate.isBlank()) {
+                Text(
+                    text = "Share it and we'll surprise you with picks tied to your birthday",
+                    color = Color.White.copy(alpha = 0.5f),
                     fontSize = 12.sp,
                     modifier = Modifier.fillMaxWidth()
                 )

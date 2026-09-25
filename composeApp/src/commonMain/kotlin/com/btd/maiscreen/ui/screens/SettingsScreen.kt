@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,9 +13,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.btd.maiscreen.api.CreatorApiClient
+import com.btd.maiscreen.api.CreatorApiResult
 import com.btd.maiscreen.config.AppSettings
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +33,34 @@ fun SettingsScreen(
 ) {
     // Observe test data setting - initialize from AppSettings
     var useTestData by remember { mutableStateOf(AppSettings.useTestData) }
+
+    // Video generation provider: shared enterprise key (metered) vs the
+    // user's own connected Higgsfield account (BYOK, unmetered by this app).
+    val coroutineScope = rememberCoroutineScope()
+    var generationSettingsLoading by remember { mutableStateOf(true) }
+    var generationProvider by remember { mutableStateOf("enterprise") }
+    var higgsfieldConnected by remember { mutableStateOf(false) }
+    var minutesUsedThisMonth by remember { mutableStateOf(0) }
+    var minutesQuotaMonthly by remember { mutableStateOf(30) }
+    var showConnectForm by remember { mutableStateOf(false) }
+    var connectKeyId by remember { mutableStateOf("") }
+    var connectKeySecret by remember { mutableStateOf("") }
+    var isSubmittingProvider by remember { mutableStateOf(false) }
+    var providerActionError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        when (val result = CreatorApiClient.getUserSettings()) {
+            is CreatorApiResult.Success -> {
+                generationProvider = result.data.generationProvider
+                higgsfieldConnected = result.data.connected
+                minutesUsedThisMonth = result.data.minutesUsedThisMonth
+                minutesQuotaMonthly = result.data.minutesQuotaMonthly
+            }
+            is CreatorApiResult.Failure -> providerActionError = result.message
+        }
+        generationSettingsLoading = false
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -387,20 +421,142 @@ fun SettingsScreen(
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1E3A8A)
                     )
-                    
+
                     Text(
-                        text = "Manage your account settings",
+                        text = "Choose how your AI video generations are billed",
                         fontSize = 14.sp,
                         color = Color.Gray
                     )
-                    
-                    // Placeholder for future account settings
-                    Text(
-                        text = "Coming soon...",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+
+                    if (generationSettingsLoading) {
+                        Text(text = "Loading...", fontSize = 14.sp, color = Color.Gray)
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Use My Own Higgsfield Account",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = when {
+                                        generationProvider == "byok" && higgsfieldConnected -> "✅ Connected — generations use your account"
+                                        generationProvider == "byok" -> "⚠️ Not connected yet"
+                                        else -> "☁️ Using the app's shared generation (metered)"
+                                    },
+                                    fontSize = 12.sp,
+                                    color = if (generationProvider == "byok" && higgsfieldConnected) Color(0xFF059669) else Color(0xFF1E3A8A)
+                                )
+                            }
+
+                            Switch(
+                                checked = generationProvider == "byok",
+                                onCheckedChange = { useOwnKey ->
+                                    providerActionError = null
+                                    if (useOwnKey) {
+                                        showConnectForm = true
+                                    } else {
+                                        isSubmittingProvider = true
+                                        coroutineScope.launch {
+                                            when (val result = CreatorApiClient.disconnectHiggsfieldKey()) {
+                                                is CreatorApiResult.Success -> {
+                                                    generationProvider = result.data.generationProvider
+                                                    higgsfieldConnected = result.data.connected
+                                                    showConnectForm = false
+                                                }
+                                                is CreatorApiResult.Failure -> providerActionError = result.message
+                                            }
+                                            isSubmittingProvider = false
+                                        }
+                                    }
+                                },
+                                enabled = !isSubmittingProvider,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFF059669),
+                                    uncheckedThumbColor = Color.White,
+                                    uncheckedTrackColor = Color(0xFF1E3A8A)
+                                )
+                            )
+                        }
+
+                        if (generationProvider != "byok") {
+                            Text(
+                                text = "$minutesUsedThisMonth / $minutesQuotaMonthly minutes used this month",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
+
+                        if (showConnectForm) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = connectKeyId,
+                                onValueChange = { connectKeyId = it },
+                                label = { Text("Higgsfield Key ID") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = connectKeySecret,
+                                onValueChange = { connectKeySecret = it },
+                                label = { Text("Higgsfield Key Secret") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Button(
+                                    onClick = {
+                                        isSubmittingProvider = true
+                                        providerActionError = null
+                                        coroutineScope.launch {
+                                            when (val result = CreatorApiClient.connectHiggsfieldKey(connectKeyId.trim(), connectKeySecret.trim())) {
+                                                is CreatorApiResult.Success -> {
+                                                    generationProvider = result.data.generationProvider
+                                                    higgsfieldConnected = result.data.connected
+                                                    showConnectForm = false
+                                                    connectKeyId = ""
+                                                    connectKeySecret = ""
+                                                }
+                                                is CreatorApiResult.Failure -> providerActionError = result.message
+                                            }
+                                            isSubmittingProvider = false
+                                        }
+                                    },
+                                    enabled = !isSubmittingProvider && connectKeyId.isNotBlank() && connectKeySecret.isNotBlank(),
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E3A8A))
+                                ) {
+                                    Text(if (isSubmittingProvider) "Connecting..." else "Connect")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        showConnectForm = false
+                                        connectKeyId = ""
+                                        connectKeySecret = ""
+                                        providerActionError = null
+                                    },
+                                    enabled = !isSubmittingProvider
+                                ) {
+                                    Text("Cancel")
+                                }
+                            }
+                        }
+
+                        providerActionError?.let { message ->
+                            Text(text = message, fontSize = 12.sp, color = Color(0xFFDC2626))
+                        }
+                    }
                 }
             }
             

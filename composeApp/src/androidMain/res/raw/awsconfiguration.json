@@ -8,8 +8,8 @@
         "Version": "0.1.0",
         "CognitoUserPool": {
           "Default": {
-            "PoolId": "us-east-1_rty4feGNd",
-            "AppClientId": "11jljm542ir3b5ejqqeu9nn20q",
+            "PoolId": "us-east-1_Gq4wuDx36",
+            "AppClientId": "4lajv3c4o2qnqaui158536cefn",
             "Region": "us-east-1"
           }
         },

@@ -18,6 +18,9 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
 
+# Creator Suite web app — lives in its own separate repo
+urban-anime-studio/
+
 # Security - Environment and secrets
 .env*
 *.key

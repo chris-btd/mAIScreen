@@ -21,6 +21,14 @@ expect object AppConfig {
     val cognitoLogoutUri: String
     val cognitoScope: String
 
+<<<<<<< Updated upstream
     // Build-time test mode flag (secure)
     val isTestMode: Boolean
+=======
+    // AWS AppSync (content catalog GraphQL endpoint)
+    val appSyncEndpoint: String
+
+    // AWS API Gateway (REST edge routes behind CloudFront /api/*, e.g. /api/generate-video)
+    val apiGatewayBaseUrl: String
+>>>>>>> Stashed changes
 }

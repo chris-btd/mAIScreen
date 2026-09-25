@@ -5,6 +5,8 @@ enum AppScreen {
     case splash
     case login
     case signUp
+    case confirmation
+    case forceChangePassword
     case subscription
     case payment
     case main
@@ -21,6 +23,13 @@ struct ContentView: View {
     @State private var recentlyWatched: [ContentItem] = []
     @State private var selectedContentType: String = ""
     @State private var selectedSubType: String = ""
+    @State private var pendingSignUpEmail: String = ""
+    // Held only in memory between SignUp and Confirmation so we can sign the user in
+    // immediately after confirming — Cognito's confirmSignUp does NOT establish a
+    // session by itself. Cleared right after that sign-in attempt completes.
+    @State private var pendingSignUpPassword: String = ""
+    @State private var pendingForceChangeEmail: String = ""
+    @State private var authErrorMessage: String? = nil
     @StateObject private var authService = AuthService.shared
     
     var body: some View {
@@ -46,16 +55,33 @@ struct ContentView: View {
         case .login:
             LoginView(
                 onLoginClick: { email, password in
-                    print("🔑 iOS: Starting login for: \(email)")
-                    
+                    print("🔑 iOS: Starting native Amplify sign-in for: \(email)")
+
                     // Check if already authenticated first
                     if authService.isAuthenticated {
                         print("ℹ️ iOS: User already authenticated, skipping login")
                         return
                     }
-                    
-                    // Use AuthService to simulate login
-                    authService.simulateLogin(email: email, password: password)
+
+                    authErrorMessage = nil
+                    authService.signIn(email: email, password: password) { outcome, error in
+                        switch outcome {
+                        case .success:
+                            print("✅ iOS: Native sign-in successful")
+                        case .needsNewPassword:
+                            print("🔐 iOS: Account requires a new password")
+                            pendingForceChangeEmail = email
+                            currentScreen = .forceChangePassword
+                        case .needsConfirmation:
+                            print("📧 iOS: Account not confirmed, routing to verification")
+                            pendingSignUpEmail = email
+                            authService.resendConfirmationCode(username: email)
+                            currentScreen = .confirmation
+                        case .failed:
+                            print("❌ iOS: Native sign-in failed: \(error ?? "Unknown error")")
+                            authErrorMessage = error ?? "Login failed. Please check your credentials and try again."
+                        }
+                    }
                 },
                 onSignUpClick: {
                     currentScreen = .signUp
@@ -64,14 +90,85 @@ struct ContentView: View {
         case .signUp:
             SignUpView(
                 onSignUpClick: { firstName, lastName, email, password in
-                    // TODO: Implement sign up logic - after backend validation, go to subscription
-                    print("Sign up attempt: \(firstName) \(lastName), \(email)")
-                    // Simulate successful sign up and proceed to subscription
-                    currentScreen = .subscription
+                    print("🚀 iOS: Starting Amplify sign up: \(firstName) \(lastName), \(email)")
+
+                    authErrorMessage = nil
+                    pendingSignUpEmail = email
+                    pendingSignUpPassword = password
+                    authService.signUp(firstName: firstName, lastName: lastName, email: email, password: password, birthdate: "") { success, needsConfirmation, error in
+                        if success {
+                            if needsConfirmation {
+                                currentScreen = .confirmation
+                            } else {
+                                currentScreen = .subscription
+                            }
+                        } else {
+                            print("❌ iOS: Sign up failed: \(error ?? "Unknown error")")
+                            authErrorMessage = error ?? "Sign up failed. Please try again."
+                        }
+                    }
                 },
                 onBackToLoginClick: {
                     currentScreen = .login
                 }
+            )
+        case .confirmation:
+            ConfirmationView(
+                email: pendingSignUpEmail,
+                onConfirmClick: { code in
+                    print("🔐 iOS: Confirming sign up with code: \(code)")
+                    authErrorMessage = nil
+                    authService.confirmSignUp(username: pendingSignUpEmail, confirmationCode: code) { success, error in
+                        if success {
+                            // Confirming the code only marks the account verified in Cognito —
+                            // it does not establish a session, so sign in now with the
+                            // password we held onto since SignUp.
+                            let email = pendingSignUpEmail
+                            let password = pendingSignUpPassword
+                            authService.signIn(email: email, password: password) { outcome, signInError in
+                                pendingSignUpPassword = ""
+                                switch outcome {
+                                case .success:
+                                    currentScreen = .subscription
+                                default:
+                                    print("❌ iOS: Sign-in after confirmation failed: \(signInError ?? "Unknown error")")
+                                    currentScreen = .login
+                                }
+                            }
+                        } else {
+                            authErrorMessage = error ?? "Invalid verification code. Please try again."
+                        }
+                    }
+                },
+                onResendClick: {
+                    print("📧 iOS: Resending confirmation code")
+                    authService.resendConfirmationCode(username: pendingSignUpEmail)
+                },
+                onBackClick: {
+                    currentScreen = .signUp
+                },
+                errorMessage: authErrorMessage,
+                onErrorDismiss: { authErrorMessage = nil }
+            )
+        case .forceChangePassword:
+            ForceChangePasswordView(
+                email: pendingForceChangeEmail,
+                onSubmit: { newPassword, firstName, lastName in
+                    print("🔐 iOS: Submitting new password for forced change")
+                    authErrorMessage = nil
+                    authService.confirmSignInNewPassword(
+                        newPassword: newPassword,
+                        email: pendingForceChangeEmail,
+                        firstName: firstName,
+                        lastName: lastName
+                    ) { success, error in
+                        if !success {
+                            authErrorMessage = error ?? "Failed to set new password. Please try again."
+                        }
+                    }
+                },
+                errorMessage: authErrorMessage,
+                onErrorDismiss: { authErrorMessage = nil }
             )
             case .subscription:
                 SubscriptionView(
@@ -203,6 +300,15 @@ struct ContentView: View {
                 currentScreen = .login
             }
         }
+        .alert(
+            currentScreen == .signUp ? "Sign Up Failed" : "Login Error",
+            isPresented: Binding(
+                get: { authErrorMessage != nil && (currentScreen == .login || currentScreen == .signUp) },
+                set: { _ in authErrorMessage = nil }
+            ),
+            actions: { Button("OK") { authErrorMessage = nil } },
+            message: { Text(authErrorMessage ?? "") }
+        )
     }
     
     // Helper function to add content to recently watched

@@ -26,8 +26,8 @@ class MaiScreenApplication : Application() {
             Amplify.configure(com.amplifyframework.core.AmplifyConfiguration.fromConfigFile(applicationContext, com.btd.maiscreen.R.raw.awsconfiguration), applicationContext)
             
             Log.i(TAG, "✅ Initialized Amplify successfully")
-            Log.i(TAG, "📋 Cognito User Pool: us-east-1_rty4feGNd")
-            Log.i(TAG, "📋 App Client ID: 11jljm542ir3b5ejqqeu9nn20q")
+            Log.i(TAG, "📋 Cognito issuer: ${com.btd.maiscreen.config.AppConfig.cognitoIssuerUri}")
+            Log.i(TAG, "📋 App Client ID: ${com.btd.maiscreen.config.AppConfig.cognitoClientId}")
             
             // Check current auth state
             Amplify.Auth.fetchAuthSession(

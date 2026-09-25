@@ -10,6 +10,8 @@ import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import com.btd.maiscreen.auth.AuthManager
 import com.btd.maiscreen.auth.AppAuthState
+import com.btd.maiscreen.auth.SignInOutcome
+import com.btd.maiscreen.ui.screens.ForceChangePasswordScreen
 import com.btd.maiscreen.config.AppConfig
 import com.btd.maiscreen.ui.screens.SplashScreen
 import com.btd.maiscreen.ui.screens.LoginScreen
@@ -24,6 +26,7 @@ import com.btd.maiscreen.ui.screens.PurchaseMinutesScreen
 import com.btd.maiscreen.ui.screens.ProfileScreen
 import com.btd.maiscreen.ui.screens.UploadTemplateScreen
 import com.btd.maiscreen.ui.screens.MediaSubmissionScreen
+import com.btd.maiscreen.ui.screens.CreatorSuiteScreen
 import com.btd.maiscreen.ui.screens.ContentItem
 import com.btd.maiscreen.config.AppSettings
 import com.btd.maiscreen.viewmodel.AppViewModel
@@ -43,6 +46,11 @@ fun App() {
         var selectedContentType by remember { mutableStateOf("") }
         var selectedSubType by remember { mutableStateOf("") }
         var pendingSignUpEmail by remember { mutableStateOf("") }
+        // Held only in memory between SignUp and Confirmation so we can sign the user in
+        // immediately after confirming — Cognito's confirmSignUp does NOT establish a
+        // session by itself. Cleared right after that sign-in attempt completes.
+        var pendingSignUpPassword by remember { mutableStateOf("") }
+        var pendingForceChangeEmail by remember { mutableStateOf("") }
         var isSignUpLoading by remember { mutableStateOf(false) }
         
         // Observe authentication state
@@ -51,7 +59,7 @@ fun App() {
         
         // Auto-navigate based on authentication state
         LaunchedEffect(isAuthenticated) {
-            if (isAuthenticated && currentScreen in listOf(AppScreen.Login, AppScreen.SignUp, AppScreen.Confirmation)) {
+            if (isAuthenticated && currentScreen in listOf(AppScreen.Login, AppScreen.SignUp, AppScreen.Confirmation, AppScreen.ForceChangePassword)) {
                 println("🔐 User authenticated, navigating to main screen")
                 currentScreen = AppScreen.Main
             } else if (!isAuthenticated && currentScreen == AppScreen.Main) {
@@ -95,21 +103,36 @@ fun App() {
                             return@LoginScreen
                         }
                         
-                        AuthManager.signInWithAmplify(email, password) { success, error ->
+                        AuthManager.signInWithAmplify(email, password) { outcome, error ->
                             isLoading = false // Stop loading spinner
-                            
-                            if (success) {
-                                println("✅ Native sign-in successful!")
-                                AppAuthState.setAuthenticated(true, email)
-                            } else {
-                                println("❌ Native sign-in failed: $error")
-                                // Handle "already signed in" error gracefully
-                                if (error?.contains("already a user signed in") == true) {
-                                    println("ℹ️ User was already signed in, updating state")
+
+                            when (outcome) {
+                                SignInOutcome.SUCCESS -> {
+                                    println("✅ Native sign-in successful!")
                                     AppAuthState.setAuthenticated(true, email)
-                                } else {
-                                    // Show error to user
-                                    appViewModel.showError(error ?: "Login failed. Please check your credentials and try again.")
+                                }
+                                SignInOutcome.NEEDS_NEW_PASSWORD -> {
+                                    println("🔐 Account requires a new password")
+                                    pendingForceChangeEmail = email
+                                    currentScreen = AppScreen.ForceChangePassword
+                                }
+                                SignInOutcome.NEEDS_CONFIRMATION -> {
+                                    println("📧 Account not yet confirmed, routing to verification")
+                                    pendingSignUpEmail = email
+                                    AuthManager.resendConfirmationCode(email)
+                                    appViewModel.showSuccess("Please verify your email. We've sent a new code to $email.")
+                                    currentScreen = AppScreen.Confirmation
+                                }
+                                SignInOutcome.FAILED -> {
+                                    println("❌ Native sign-in failed: $error")
+                                    // Handle "already signed in" error gracefully
+                                    if (error?.contains("already a user signed in") == true) {
+                                        println("ℹ️ User was already signed in, updating state")
+                                        AppAuthState.setAuthenticated(true, email)
+                                    } else {
+                                        // Show error to user
+                                        appViewModel.showError(error ?: "Login failed. Please check your credentials and try again.")
+                                    }
                                 }
                             }
                         }
@@ -127,6 +150,7 @@ fun App() {
                     onSignUpClick = { firstName, lastName, email, password, birthdate ->
                         println("🚀 Starting Amplify sign up: $firstName $lastName, $email, birthdate: $birthdate")
                         pendingSignUpEmail = email
+                        pendingSignUpPassword = password
                         isSignUpLoading = true
                         appViewModel.clearError()
                         
@@ -161,8 +185,26 @@ fun App() {
                         appViewModel.clearError()
                         AuthManager.confirmSignUp(pendingSignUpEmail, confirmationCode) { success ->
                             if (success) {
-                                appViewModel.showSuccess("Email verified successfully!")
-                                currentScreen = AppScreen.Subscription
+                                // Confirming the code only marks the account verified in Cognito —
+                                // it does not establish a session, so sign in now with the
+                                // password we held onto since SignUp.
+                                val email = pendingSignUpEmail
+                                val password = pendingSignUpPassword
+                                AuthManager.signInWithAmplify(email, password) { outcome, error ->
+                                    pendingSignUpPassword = ""
+                                    when (outcome) {
+                                        SignInOutcome.SUCCESS -> {
+                                            AppAuthState.setAuthenticated(true, email)
+                                            appViewModel.showSuccess("Email verified successfully!")
+                                            currentScreen = AppScreen.Subscription
+                                        }
+                                        else -> {
+                                            println("❌ Sign-in after confirmation failed: $error")
+                                            appViewModel.showSuccess("Email verified! Please sign in to continue.")
+                                            currentScreen = AppScreen.Login
+                                        }
+                                    }
+                                }
                             } else {
                                 println("❌ Confirmation failed")
                                 appViewModel.showError("Invalid verification code. Please try again.")
@@ -179,10 +221,40 @@ fun App() {
                         currentScreen = AppScreen.SignUp
                     },
                     onBypassClick = {
-                        println("🔧 DEV MODE: Bypassing email verification")
-                        // In debug builds, skip email verification and go straight to subscription
+                        // UI-navigation shortcut only — this never calls confirmSignUp, so the
+                        // account stays UNCONFIRMED in Cognito and can never sign in for real
+                        // (Cognito rejects sign-in for unconfirmed users). Anything past this
+                        // point that requires a real JWT (e.g. video playback) will fail until
+                        // the account is confirmed and signed in through the normal path.
+                        println("🔧 DEV MODE: Bypassing email verification (UI only — no real session will exist)")
+                        pendingSignUpPassword = ""
                         currentScreen = AppScreen.Subscription
                     }
+                )
+            }
+            AppScreen.ForceChangePassword -> {
+                var isLoading by remember { mutableStateOf(false) }
+
+                ForceChangePasswordScreen(
+                    email = pendingForceChangeEmail,
+                    onSubmit = { newPassword, firstName, lastName ->
+                        println("🔐 Submitting new password for forced change")
+                        appViewModel.clearError()
+                        isLoading = true
+                        AuthManager.confirmSignInNewPassword(newPassword, firstName, lastName) { success, error ->
+                            isLoading = false
+                            if (success) {
+                                println("✅ New password set, sign-in complete")
+                                AppAuthState.setAuthenticated(true, pendingForceChangeEmail)
+                            } else {
+                                println("❌ Failed to set new password: $error")
+                                appViewModel.showError(error ?: "Failed to set new password. Please try again.")
+                            }
+                        }
+                    },
+                    isLoading = isLoading,
+                    errorMessage = appViewModel.errorMessage,
+                    onErrorDismiss = { appViewModel.clearError() }
                 )
             }
                 AppScreen.Subscription -> {
@@ -239,6 +311,10 @@ fun App() {
                             println("Upload clicked")
                             currentScreen = AppScreen.UploadTemplate
                         },
+                        onCreatorSuiteClick = {
+                            println("Creator Suite clicked")
+                            currentScreen = AppScreen.CreatorSuite
+                        },
                         onContentClick = { content ->
                             println("Content clicked: ${content.title}")
                             // TODO: Navigate to content player
@@ -274,6 +350,13 @@ fun App() {
                             }
                         )
                     }
+                }
+                AppScreen.CreatorSuite -> {
+                    CreatorSuiteScreen(
+                        onBackClick = {
+                            currentScreen = AppScreen.Main
+                        }
+                    )
                 }
                 AppScreen.Settings -> {
                     SettingsScreen(
@@ -412,10 +495,12 @@ enum class AppScreen {
     Login,
     SignUp,
     Confirmation,
+    ForceChangePassword,
     Subscription,
     Payment,
     Main,
     VideoPlayer,
+    CreatorSuite,
     Settings,
     PurchaseMinutes,
     UploadTemplate,

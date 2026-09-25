@@ -36,6 +36,8 @@ kotlin {
             // AWS Amplify for Cognito User Pool management
             implementation("com.amplifyframework:aws-auth-cognito:2.14.5")
             implementation("com.amplifyframework:core:2.14.5")
+
+            implementation(libs.ktor.client.okhttp)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -50,6 +52,10 @@ kotlin {
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor)
             implementation(projects.shared)
+
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.contentNegotiation)
+            implementation(libs.ktor.serialization.kotlinxJson)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -57,6 +63,8 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+
+            implementation(libs.ktor.client.okhttp)
         }
     }
 }
@@ -85,11 +93,17 @@ android {
         buildConfigField("String", "DEMO_VIDEO_3", "\"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4\"")
         
         // AWS Cognito Configuration
-        buildConfigField("String", "COGNITO_ISSUER_URI", "\"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_rty4feGNd\"")
-        buildConfigField("String", "COGNITO_CLIENT_ID", "\"11jljm542ir3b5ejqqeu9nn20q\"")
+        buildConfigField("String", "COGNITO_ISSUER_URI", "\"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Gq4wuDx36\"")
+        buildConfigField("String", "COGNITO_CLIENT_ID", "\"4lajv3c4o2qnqaui158536cefn\"")
         buildConfigField("String", "COGNITO_REDIRECT_URI", "\"maiscreen.auth://callback\"")
         buildConfigField("String", "COGNITO_LOGOUT_URI", "\"maiscreen.auth://logout\"")
         buildConfigField("String", "COGNITO_SCOPE", "\"email openid phone\"")
+
+        // AWS AppSync GraphQL endpoint for the content catalog (Settings tab -> API URL in the AppSync console)
+        buildConfigField("String", "APPSYNC_ENDPOINT", "\"https://REPLACE_ME.appsync-api.us-east-1.amazonaws.com/graphql\"")
+
+        // AWS API Gateway (REST edge routes behind CloudFront /api/*)
+        buildConfigField("String", "API_GATEWAY_BASE_URL", "\"https://d2ofvyi6ramrc2.cloudfront.net\"")
         
         // Manifest placeholders for Cognito redirect handling
         manifestPlaceholders["appAuthRedirectScheme"] = "maiscreen.auth"

@@ -23,6 +23,12 @@ actual object AppConfig {
     actual val cognitoLogoutUri: String = BuildConfig.COGNITO_LOGOUT_URI
     actual val cognitoScope: String = BuildConfig.COGNITO_SCOPE
 
+<<<<<<< Updated upstream
     // Build-time test mode flag (secure - cannot be changed at runtime)
     actual val isTestMode: Boolean = BuildConfig.IS_TEST_MODE
+=======
+    actual val appSyncEndpoint: String = BuildConfig.APPSYNC_ENDPOINT
+
+    actual val apiGatewayBaseUrl: String = BuildConfig.API_GATEWAY_BASE_URL
+>>>>>>> Stashed changes
 }

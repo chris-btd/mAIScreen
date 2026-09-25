@@ -80,6 +80,7 @@ fun MainScreen(
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onUploadClick: () -> Unit = {},
+    onCreatorSuiteClick: () -> Unit = {},
     onContentClick: (ContentItem) -> Unit = {},
     onPlayContent: (ContentItem) -> Unit = {},
     onToggleLike: (ContentItem) -> Unit = {},
@@ -217,6 +218,10 @@ fun MainScreen(
                 onUploadClick = {
                     showDrawer = false
                     onUploadClick()
+                },
+                onCreatorSuiteClick = {
+                    showDrawer = false
+                    onCreatorSuiteClick()
                 }
             )
         }
@@ -359,7 +364,7 @@ private fun FeaturedContentHero(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(horizontal = 48.dp, vertical = 48.dp)
-                .fillMaxWidth(0.6f),
+                .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -1435,7 +1440,8 @@ private fun ErrorScreen(
 private fun SlidingDrawer(
     onDismiss: () -> Unit,
     onSettingsClick: () -> Unit,
-    onUploadClick: () -> Unit
+    onUploadClick: () -> Unit,
+    onCreatorSuiteClick: () -> Unit
 ) {
     // Dark overlay background
     Box(
@@ -1533,7 +1539,33 @@ private fun SlidingDrawer(
                     color = Color.White.copy(alpha = 0.1f),
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
-                
+
+                // Creator Suite option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onCreatorSuiteClick)
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "🎬",
+                        fontSize = 24.sp
+                    )
+                    Text(
+                        text = "Creator Suite",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Divider(
+                    color = Color.White.copy(alpha = 0.1f),
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+
                 // Settings option
                 Row(
                     modifier = Modifier

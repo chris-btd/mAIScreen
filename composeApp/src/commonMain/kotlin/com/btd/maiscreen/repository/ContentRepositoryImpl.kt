@@ -1,6 +1,12 @@
 package com.btd.maiscreen.repository
 
 import androidx.compose.ui.graphics.Color
+import com.btd.maiscreen.api.AppSyncClient
+import com.btd.maiscreen.api.AppSyncResult
+import com.btd.maiscreen.api.CatalogResponse
+import com.btd.maiscreen.api.GET_CATALOG_QUERY
+import com.btd.maiscreen.api.HERO_COLLECTION_SLUG
+import com.btd.maiscreen.api.ProgramDto
 import com.btd.maiscreen.config.AppConfig
 import com.btd.maiscreen.config.AppSettings
 import com.btd.maiscreen.config.CategoryConfig
@@ -45,16 +51,30 @@ class ContentRepositoryImpl(
 
     override suspend fun getFeaturedContent(): ContentResult<ContentItem> {
         return try {
-            // Check if we should use test data or fetch from AWS
             if (AppSettings.useTestData) {
                 return getConfigDrivenFeaturedContent()
-            } else {
-                return try {
-                    delay(500)
-                    // TODO: Replace with actual AWS API call
-                    getConfigDrivenFeaturedContent()
-                } catch (e: Exception) {
-                    println("AWS API call failed, using test data: ${e.message}")
+            }
+
+            when (val remote = fetchCatalog()) {
+                is AppSyncResult.Success -> {
+                    val hero = remote.data.listCollections?.items
+                        ?.firstOrNull { it.slug == HERO_COLLECTION_SLUG }
+                        ?.items?.items?.firstOrNull()
+                        ?: remote.data.listCollections?.items
+                            ?.firstOrNull { it.slug != HERO_COLLECTION_SLUG }
+                            ?.items?.items?.firstOrNull()
+
+                    if (hero != null) {
+                        val item = hero.toContentItem(cloudFrontDomain)
+                        contentStorage[item.id] = item
+                        Success(item)
+                    } else {
+                        println("AppSync returned no catalog content yet, using test data")
+                        getConfigDrivenFeaturedContent()
+                    }
+                }
+                is AppSyncResult.Failure -> {
+                    println("AppSync call failed (${remote.message}), using test data")
                     getConfigDrivenFeaturedContent()
                 }
             }
@@ -86,19 +106,92 @@ class ContentRepositoryImpl(
         return try {
             if (AppSettings.useTestData) {
                 return getConfigDrivenCategories()
-            } else {
-                return try {
-                    delay(500)
-                    // TODO: Replace with actual AWS API call
-                    getConfigDrivenCategories()
-                } catch (e: Exception) {
-                    println("AWS API call failed, using test data: ${e.message}")
+            }
+
+            when (val remote = fetchCatalog()) {
+                is AppSyncResult.Success -> {
+                    val collections = remote.data.listCollections?.items.orEmpty()
+                    val categories = collections
+                        .filter { it.slug != HERO_COLLECTION_SLUG }
+                        .sortedBy { it.order ?: Int.MAX_VALUE }
+                        .mapNotNull { collection ->
+                            val items = collection.items?.items.orEmpty()
+                                .map { it.toContentItem(cloudFrontDomain) }
+                            if (items.isEmpty()) return@mapNotNull null
+                            ContentCategory(
+                                id = collection.id,
+                                name = collection.title,
+                                items = items
+                            )
+                        }
+
+                    if (categories.isNotEmpty()) {
+                        categories.forEach { category ->
+                            category.items.forEach { item -> contentStorage[item.id] = item }
+                        }
+                        Success(categories)
+                    } else {
+                        println("AppSync returned no categories yet, using test data")
+                        getConfigDrivenCategories()
+                    }
+                }
+                is AppSyncResult.Failure -> {
+                    println("AppSync call failed (${remote.message}), using test data")
                     getConfigDrivenCategories()
                 }
             }
         } catch (e: Exception) {
             NetworkError(e)
         }
+    }
+
+    // Cached per-repository-instance so getFeaturedContent + getContentCategories
+    // (called back-to-back on screen load) don't double up on the network call.
+    private var cachedCatalog: AppSyncResult<CatalogResponse>? = null
+
+    private suspend fun fetchCatalog(): AppSyncResult<CatalogResponse> {
+        cachedCatalog?.let { return it }
+        val result = AppSyncClient.query<CatalogResponse>(GET_CATALOG_QUERY)
+        cachedCatalog = result
+        return result
+    }
+
+    /**
+     * Maps a Program from AppSync to the app's ContentItem model. Several fields
+     * (cast, director, year, rating, genres, a single display category) have no
+     * home in the schema yet — see CatalogQueries.kt for why — so they're left
+     * as empty defaults rather than guessed until that's decided.
+     */
+    private fun ProgramDto.toContentItem(cloudFrontDomain: String): ContentItem {
+        val asset = primaryAsset
+        val imageUrl = posterKey?.let { "https://$cloudFrontDomain/$it" }
+            ?: asset?.let { "https://$cloudFrontDomain/${it.thumbsPrefix ?: "assets/${it.assetId}/thumbs"}/thumbnail.jpg" }
+        val backdrop = heroKey?.let { "https://$cloudFrontDomain/$it" }
+
+        return ContentItem(
+            id = id,
+            title = title,
+            description = logline ?: "",
+            synopsis = synopsis ?: "",
+            thumbnailColor = Color(0xFF6366F1),
+            category = "",
+            duration = asset?.durationSec?.let(::formatDuration) ?: "",
+            rating = "",
+            year = "",
+            ageRating = maturityRating ?: "",
+            genres = emptyList(),
+            cast = emptyList(),
+            director = "",
+            assetId = asset?.assetId ?: id,
+            imageUrl = imageUrl,
+            backdropUrl = backdrop
+        )
+    }
+
+    private fun formatDuration(totalSeconds: Int): String {
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
     }
 
     private suspend fun getConfigDrivenCategories(): ContentResult<List<ContentCategory>> {

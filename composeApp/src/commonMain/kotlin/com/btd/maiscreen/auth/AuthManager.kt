@@ -1,6 +1,17 @@
 package com.btd.maiscreen.auth
 
 /**
+ * Outcome of a native sign-in attempt, mirroring the Cognito next-step cases
+ * the app knows how to route (new-password-required, unconfirmed account).
+ */
+enum class SignInOutcome {
+    SUCCESS,
+    NEEDS_NEW_PASSWORD,
+    NEEDS_CONFIRMATION,
+    FAILED
+}
+
+/**
  * Simple singleton to hold reference to CognitoAuthService and AmplifyAuthService for access from common code
  * This is a temporary solution - in production, use proper DI framework
  */
@@ -178,12 +189,62 @@ object AuthManager {
     fun signInWithAmplify(
         email: String,
         password: String,
-        callback: (success: Boolean, error: String?) -> Unit
+        callback: (outcome: SignInOutcome, error: String?) -> Unit
     ) {
         try {
             val service = amplifyAuthService
             if (service != null) {
                 // Set callback on the service
+                val onSignInSuccessField = service::class.java.getDeclaredField("onSignInSuccess")
+                onSignInSuccessField.isAccessible = true
+                onSignInSuccessField.set(service) {
+                    callback(SignInOutcome.SUCCESS, null)
+                }
+
+                val onSignInErrorField = service::class.java.getDeclaredField("onSignInError")
+                onSignInErrorField.isAccessible = true
+                onSignInErrorField.set(service) { error: String ->
+                    println("Sign in error: $error")
+                    callback(SignInOutcome.FAILED, error)
+                }
+
+                val onNewPasswordRequiredField = service::class.java.getDeclaredField("onNewPasswordRequired")
+                onNewPasswordRequiredField.isAccessible = true
+                onNewPasswordRequiredField.set(service) {
+                    callback(SignInOutcome.NEEDS_NEW_PASSWORD, null)
+                }
+
+                val onSignInNeedsConfirmationField = service::class.java.getDeclaredField("onSignInNeedsConfirmation")
+                onSignInNeedsConfirmationField.isAccessible = true
+                onSignInNeedsConfirmationField.set(service) {
+                    callback(SignInOutcome.NEEDS_CONFIRMATION, null)
+                }
+
+                // Call signIn method
+                val method = service::class.java.getMethod("signIn", String::class.java, String::class.java)
+                method.invoke(service, email, password)
+            } else {
+                callback(SignInOutcome.FAILED, "Authentication service not available")
+            }
+        } catch (e: Exception) {
+            println("Failed to sign in with Amplify: ${e.message}")
+            callback(SignInOutcome.FAILED, e.message ?: "Unknown error occurred")
+        }
+    }
+
+    /**
+     * Complete a sign-in that Cognito flagged as requiring a new password
+     * (e.g. an admin-created user with FORCE_CHANGE_PASSWORD status).
+     */
+    fun confirmSignInNewPassword(
+        newPassword: String,
+        firstName: String? = null,
+        lastName: String? = null,
+        callback: (success: Boolean, error: String?) -> Unit
+    ) {
+        try {
+            val service = amplifyAuthService
+            if (service != null) {
                 val onSignInSuccessField = service::class.java.getDeclaredField("onSignInSuccess")
                 onSignInSuccessField.isAccessible = true
                 onSignInSuccessField.set(service) {
@@ -193,18 +254,22 @@ object AuthManager {
                 val onSignInErrorField = service::class.java.getDeclaredField("onSignInError")
                 onSignInErrorField.isAccessible = true
                 onSignInErrorField.set(service) { error: String ->
-                    println("Sign in error: $error")
+                    println("Confirm new password error: $error")
                     callback(false, error)
                 }
 
-                // Call signIn method
-                val method = service::class.java.getMethod("signIn", String::class.java, String::class.java)
-                method.invoke(service, email, password)
+                val method = service::class.java.getMethod(
+                    "confirmSignInNewPassword",
+                    String::class.java,
+                    String::class.java,
+                    String::class.java
+                )
+                method.invoke(service, newPassword, firstName, lastName)
             } else {
                 callback(false, "Authentication service not available")
             }
         } catch (e: Exception) {
-            println("Failed to sign in with Amplify: ${e.message}")
+            println("Failed to confirm new password: ${e.message}")
             callback(false, e.message ?: "Unknown error occurred")
         }
     }
